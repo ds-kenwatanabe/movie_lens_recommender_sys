@@ -5,7 +5,7 @@ from torch.utils.data import Dataset
 
 
 class MovieLens(Dataset):
-    def __init__(self, file_path='/home/chris/PycharmProjects/recommender_movie_lens/ml-20m/ratings.csv'):
+    def __init__(self, file_path='/home/chris/PycharmProjects/recommender_movie_lens/ml-25m/ratings.csv'):
         self.data = pd.read_csv(file_path)
         self.users = np.unique(self.data['userId'])
         self.movies = np.unique(self.data['movieId'])
