@@ -13,7 +13,7 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 BATCH_SIZE = 4096
 EMBEDDING_SIZE = 200
 LEARNING_RATE = 1e-4
-NUM_EPOCHS = 5
+NUM_EPOCHS = 20  # Might take a day or more depending on hardware
 SEED = 42
 
 # Training on the dataset
