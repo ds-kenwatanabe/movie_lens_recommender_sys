@@ -1,7 +1,7 @@
 import torch
 import numpy as np
 from tqdm import tqdm
-from torch import nn, optim
+from torch import optim
 from torch.utils.data import DataLoader, random_split
 from data import MovieLens
 from model import MatrixFactorization
