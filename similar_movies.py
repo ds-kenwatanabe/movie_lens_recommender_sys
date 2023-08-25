@@ -15,8 +15,8 @@ class SimilarMovies:
                                          num_movies,
                                          embedding_size)
 
-        load_model(self.model, '/home/chris/PycharmProjects/movie_lens_recommender_sys/ml-25m/recommender_model.pth')
-        self.movies = pd.read_csv("/home/chris/PycharmProjects/movie_lens_recommender_sys/ml-25m/movies.csv")
+        load_model(self.model, '/home/chris/PycharmProjects/recommender_movie_lens/recommender_model.pth')
+        self.movies = pd.read_csv("/home/chris/PycharmProjects/recommender_movie_lens/ml-latest/movies.csv")
 
     def get_similar(self, target_movie_id, top_n=5):
         target_movie_id = self.movielens.movie_map[target_movie_id]

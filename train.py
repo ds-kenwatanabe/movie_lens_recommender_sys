@@ -98,7 +98,7 @@ for epoch in range(NUM_EPOCHS):
     print(f"Validation Loss: {val_loss:.2f}")
 
     if val_loss < min_val_loss:
-        save_model(model, "recommender_model.pth")
+        save_model(model, "/home/chris/PycharmProjects/recommender_movie_lens/recommender_model.pth")
         min_val_loss = val_loss
 
 print('Training finished.')
