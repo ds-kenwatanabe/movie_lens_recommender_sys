@@ -3,6 +3,22 @@ import argparse
 from recommender.config import DEFAULT_MODEL_PATH, DEFAULT_RATINGS_PATH
 
 
+def temporal_split_indices(timestamps, val_ratio):
+    if not 0.0 < val_ratio < 1.0:
+        raise ValueError("--val-ratio must be between 0 and 1")
+
+    total_length = len(timestamps)
+    if total_length < 2:
+        raise ValueError("Temporal split requires at least two ratings")
+
+    train_length = int((1.0 - val_ratio) * total_length)
+    if train_length == 0 or train_length == total_length:
+        raise ValueError("--val-ratio leaves an empty train or validation split")
+
+    sorted_indices = sorted(range(total_length), key=lambda index: timestamps[index])
+    return sorted_indices[:train_length], sorted_indices[train_length:]
+
+
 def parse_args():
     parser = argparse.ArgumentParser(description="Train the MovieLens recommender.")
     parser.add_argument("--ratings-path", default=DEFAULT_RATINGS_PATH, help="Path to ratings.csv.")
@@ -26,7 +42,7 @@ def main():
     import numpy as np
     import torch
     from torch import optim
-    from torch.utils.data import DataLoader, random_split
+    from torch.utils.data import DataLoader, Subset
     from tqdm import tqdm
 
     from recommender.data import MovieLens
@@ -35,20 +51,18 @@ def main():
     from recommender.model import MatrixFactorization
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
+    torch.manual_seed(args.seed)
     movielens = MovieLens(args.ratings_path)
 
-    train_ratio = 1.0 - args.val_ratio
-    total_length = len(movielens)
-    train_length = int(train_ratio * total_length)
-    val_length = int(args.val_ratio * total_length)
+    if "timestamp" not in movielens.data.columns:
+        raise ValueError("Temporal split requires a timestamp column in the ratings data")
 
-    train_dataset, val_dataset = random_split(
-        movielens,
-        lengths=[train_length, val_length],
-        generator=torch.Generator().manual_seed(args.seed),
-    )
+    train_indices, val_indices = temporal_split_indices(movielens.data["timestamp"].tolist(), args.val_ratio)
+    train_dataset = Subset(movielens, train_indices)
+    val_dataset = Subset(movielens, val_indices)
+    shuffle_generator = torch.Generator().manual_seed(args.seed)
 
-    train_dataloader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
+    train_dataloader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, generator=shuffle_generator)
     val_dataloader = DataLoader(val_dataset, batch_size=args.batch_size)
 
     num_users, num_movies = movielens.size

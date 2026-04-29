@@ -59,8 +59,9 @@ python get_movie_ids.py --rows 10
 ```
 
 Default paths and training parameters are documented in `configs/default.yaml`.
-CLI arguments can override the dataset, movie metadata, model paths, and
-evaluation settings.
+Training uses a temporal validation split: earlier ratings train the model and
+later ratings validate it. CLI arguments can override the dataset, movie
+metadata, model paths, and evaluation settings.
 
 ## Tests
 
