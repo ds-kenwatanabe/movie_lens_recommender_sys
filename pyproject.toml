@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "movie-lens-recommender"
+version = "0.1.0"
+description = "MovieLens recommender system using matrix factorization."
+requires-python = ">=3.8"
+dependencies = [
+    "torch==2.0.1",
+    "pandas==2.0.3",
+    "numpy==1.25.2",
+    "tqdm==4.66.1",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+

@@ -1,8 +1,13 @@
 from pathlib import Path
+import sys
 
 
-PROJECT_ROOT = Path(__file__).resolve().parent
-DEFAULT_DATA_DIR = PROJECT_ROOT / "ml-25m"
-DEFAULT_RATINGS_PATH = DEFAULT_DATA_DIR / "ratings.csv"
-DEFAULT_MOVIES_PATH = DEFAULT_DATA_DIR / "movies.csv"
-DEFAULT_MODEL_PATH = PROJECT_ROOT / "recommender_model.pth"
+sys.path.insert(0, str(Path(__file__).resolve().parent / "src"))
+
+from recommender.config import (  # noqa: E402,F401
+    DEFAULT_DATA_DIR,
+    DEFAULT_MODEL_PATH,
+    DEFAULT_MOVIES_PATH,
+    DEFAULT_RATINGS_PATH,
+    PROJECT_ROOT,
+)

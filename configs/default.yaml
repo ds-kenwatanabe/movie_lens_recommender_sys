@@ -1,0 +1,11 @@
+data_dir: ml-25m
+ratings_path: ml-25m/ratings.csv
+movies_path: ml-25m/movies.csv
+model_path: recommender_model.pth
+batch_size: 4096
+embedding_size: 200
+learning_rate: 0.0001
+epochs: 20
+seed: 42
+val_ratio: 0.2
+
