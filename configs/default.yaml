@@ -8,4 +8,5 @@ learning_rate: 0.0001
 epochs: 20
 seed: 42
 val_ratio: 0.2
-
+eval_k: 10
+relevance_threshold: 4.0

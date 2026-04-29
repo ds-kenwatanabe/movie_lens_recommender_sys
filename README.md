@@ -59,7 +59,8 @@ python get_movie_ids.py --rows 10
 ```
 
 Default paths and training parameters are documented in `configs/default.yaml`.
-CLI arguments can override the dataset, movie metadata, and model paths.
+CLI arguments can override the dataset, movie metadata, model paths, and
+evaluation settings.
 
 ## Tests
 
@@ -70,6 +71,8 @@ PYTHONPATH=src python -m unittest discover -s tests
 ## Notes
 
 The model predicts explicit ratings from the global rating mean, user bias,
-movie bias, and the dot product of user/movie embeddings. It uses Mean Absolute
-Error (L1 Loss), with an embedding size of 200 by default. Training the full
+movie bias, and the dot product of user/movie embeddings. Validation reports
+MAE, RMSE, Precision@K, Recall@K, NDCG@K, HitRate@K, and catalog coverage.
+Training still optimizes Mean Absolute Error (L1 Loss), with an embedding size
+of 200 by default. Training and full-catalog ranking evaluation on the full
 MovieLens 25M dataset can take significant time depending on hardware.

@@ -13,11 +13,15 @@ def parse_args():
     parser.add_argument("--epochs", type=int, default=20, help="Might take a day or more depending on hardware.")
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--val-ratio", type=float, default=0.2)
+    parser.add_argument("--eval-k", type=int, default=10, help="K for ranking metrics such as Precision@K.")
+    parser.add_argument("--relevance-threshold", type=float, default=4.0, help="Minimum rating treated as relevant.")
     return parser.parse_args()
 
 
 def main():
     args = parse_args()
+    if args.eval_k < 1:
+        raise ValueError("--eval-k must be at least 1")
 
     import numpy as np
     import torch
@@ -66,9 +70,9 @@ def main():
         model.train()
         train_loop = tqdm(enumerate(train_dataloader), total=len(train_dataloader))
         for i, (user_id, movies_id, ratings) in train_loop:
-            user_id = user_id.squeeze().to(device)
-            movies_id = movies_id.squeeze().to(device)
-            ratings = ratings.squeeze().to(device)
+            user_id = user_id.view(-1).to(device)
+            movies_id = movies_id.view(-1).to(device)
+            ratings = ratings.view(-1).to(device)
 
             preds = model(user_id, movies_id)
             loss = loss_fn(preds, ratings)
@@ -83,12 +87,21 @@ def main():
         running_loss = running_loss / len(train_dataloader)
         print(f"Train Loss: {running_loss:.2f}")
 
-        val_loss = evaluate_model(model, val_dataloader, loss_fn, device)
-        print(f"Validation Loss: {val_loss:.2f}")
+        metrics = evaluate_model(
+            model,
+            val_dataloader,
+            device,
+            k=args.eval_k,
+            relevance_threshold=args.relevance_threshold,
+        )
+        print(
+            "Validation Metrics: "
+            + ", ".join(f"{metric}: {value:.4f}" for metric, value in metrics.items())
+        )
 
-        if val_loss < min_val_loss:
+        if metrics["mae"] < min_val_loss:
             save_model(model, args.model_path)
-            min_val_loss = val_loss
+            min_val_loss = metrics["mae"]
 
     print("Training finished.")
 
