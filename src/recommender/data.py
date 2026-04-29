@@ -17,6 +17,7 @@ class MovieLens(Dataset):
         self.movie_map = {id: np.where(self.movies == id)[0][0] for id in self.movies}
         self.data["normalized_user_id"] = self.data["userId"].map(self.user_map.get)
         self.data["normalized_movie_id"] = self.data["movieId"].map(self.movie_map.get)
+        self.global_mean = float(self.data["rating"].mean())
         self.size = len(self.users), len(self.movies)
 
     def __len__(self):
@@ -46,4 +47,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

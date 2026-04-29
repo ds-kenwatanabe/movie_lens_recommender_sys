@@ -26,7 +26,12 @@ class MovieRecommender:
         num_users, num_movies = movielens_dataset.size
         embedding_size = 200
         self.movielens = movielens_dataset
-        self.model = MatrixFactorization(num_users, num_movies, embedding_size)
+        self.model = MatrixFactorization(
+            num_users,
+            num_movies,
+            embedding_size,
+            global_mean=movielens_dataset.global_mean,
+        )
 
         load_model(self.model, model_path)
         self.movies = pd.read_csv(movies_path)

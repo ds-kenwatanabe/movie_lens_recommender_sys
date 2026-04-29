@@ -52,6 +52,7 @@ def main():
         num_users=num_users,
         num_movies=num_movies,
         embedding_size=args.embedding_size,
+        global_mean=movielens.global_mean,
     ).to(device)
 
     loss_fn = torch.nn.L1Loss().to(device)

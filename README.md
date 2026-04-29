@@ -69,6 +69,7 @@ PYTHONPATH=src python -m unittest discover -s tests
 
 ## Notes
 
-The model uses Mean Absolute Error (L1 Loss), with an embedding size of 200 by
-default. Training the full MovieLens 25M dataset can take significant time
-depending on hardware.
+The model predicts explicit ratings from the global rating mean, user bias,
+movie bias, and the dot product of user/movie embeddings. It uses Mean Absolute
+Error (L1 Loss), with an embedding size of 200 by default. Training the full
+MovieLens 25M dataset can take significant time depending on hardware.
