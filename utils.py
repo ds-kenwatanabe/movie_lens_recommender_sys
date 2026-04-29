@@ -1,12 +1,7 @@
-import torch
+from pathlib import Path
+import sys
 
 
-def save_model(model: torch.nn.Module, filepath: str):
-    torch.save(model.state_dict(), filepath)
-    return f"Model saved to: {filepath}"
+sys.path.insert(0, str(Path(__file__).resolve().parent / "src"))
 
-
-def load_model(model, filepath, device="cpu"):
-    model.load_state_dict(torch.load(filepath, map_location=device))
-    model.to(device)
-    return f"Model loaded from: {filepath}"
+from recommender.io import load_model, save_model  # noqa: E402,F401

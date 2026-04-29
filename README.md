@@ -1,47 +1,74 @@
-# 🎬 Movie Recommendation System with Matrix Factorization (PyTorch)
-This project implements a movie recommendation system using Matrix Factorization with PyTorch, leveraging the MovieLens 25M dataset. It includes:
+# Movie Recommendation System with Matrix Factorization
 
-A PyTorch-based matrix factorization model
+This project implements a MovieLens recommender system using matrix factorization
+with PyTorch. The code is organized as an importable package under `src/`.
 
-Training and evaluation pipelines
+## Project Structure
 
-Functionality to find similar movies based on learned embeddings
-
-## 📁 Project Structure
 ```bash
 .
-├── data.py                 # Data loading and preprocessing
-├── model.py                # MatrixFactorization model definition
-├── train.py                # Training loop
-├── utils.py                # Utility functions (save/load model)
-├── get_movie_ids.py        # Reads the .csv with movies    
-├── similar_movies.py       # Script to find similar movies
-├── requirements.txt
-└── README.md              
-
+├── configs/
+│   └── default.yaml
+├── notebooks/
+├── src/
+│   └── recommender/
+│       ├── data.py
+│       ├── evaluate.py
+│       ├── model.py
+│       ├── recommend.py
+│       └── train.py
+├── tests/
+├── README.md
+├── pyproject.toml
+└── requirements.txt
 ```
 
-## 🧠 Model Overview
-The model employs Matrix Factorization to learn latent embeddings for users and movies. Each user and movie is represented by a dense vector in a shared embedding space. The predicted rating is computed as the dot product of the corresponding user and movie embeddings.
+The root-level `data.py`, `model.py`, `train.py`, `similar_movies.py`,
+`get_movie_ids.py`, `paths.py`, and `utils.py` files are compatibility wrappers
+for the package modules.
 
-## 🚀 Getting Started
-Prerequisites
-Python 3.7+
+## Setup
 
-PyTorch 1.7+
+```bash
+python -m pip install -r requirements.txt
+python -m pip install -e .
+```
 
-pandas
+Download and extract the MovieLens 25M dataset into `ml-25m/`.
 
-numpy
+## Usage
 
-tqdm
+Train the model:
 
-## Dataset
-Download and extract the MovieLens 25M dataset
+```bash
+python -m recommender.train
+```
 
-## 📝 Notes
-The model uses Mean Absolute Error (L1 Loss) as the loss function.
+Find similar movies:
 
-The embedding size is set to 200 by default.
+```bash
+python -m recommender.recommend --movie-id 2959 --top-n 5
+```
 
-Training may take a significant amount of time depending on your hardware.
+The legacy wrappers still work:
+
+```bash
+python train.py
+python similar_movies.py --movie-id 2959
+python get_movie_ids.py --rows 10
+```
+
+Default paths and training parameters are documented in `configs/default.yaml`.
+CLI arguments can override the dataset, movie metadata, and model paths.
+
+## Tests
+
+```bash
+PYTHONPATH=src python -m unittest discover -s tests
+```
+
+## Notes
+
+The model uses Mean Absolute Error (L1 Loss), with an embedding size of 200 by
+default. Training the full MovieLens 25M dataset can take significant time
+depending on hardware.
