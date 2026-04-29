@@ -2,10 +2,11 @@ import torch
 import pandas as pd
 import numpy as np
 from torch.utils.data import Dataset
+from paths import DEFAULT_RATINGS_PATH
 
 
 class MovieLens(Dataset):
-    def __init__(self, file_path='/home/chris/PycharmProjects/recommender_movie_lens/ml-25m/ratings.csv'):
+    def __init__(self, file_path=DEFAULT_RATINGS_PATH):
         self.data = pd.read_csv(file_path)
         self.users = np.unique(self.data['userId'])
         self.movies = np.unique(self.data['movieId'])
@@ -30,4 +31,3 @@ if __name__ == '__main__':
     data = MovieLens()
     for i in range(10):
         print(data[i])
-

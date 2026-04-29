@@ -1,13 +1,15 @@
+import argparse
 import pandas as pd
 from torch.nn.functional import pairwise_distance
 from model import MatrixFactorization
 from data import MovieLens
+from paths import DEFAULT_MODEL_PATH, DEFAULT_MOVIES_PATH, DEFAULT_RATINGS_PATH
 from utils import load_model
 
 
 class SimilarMovies:
-    def __init__(self):
-        movielens_dataset = MovieLens()
+    def __init__(self, ratings_path=DEFAULT_RATINGS_PATH, movies_path=DEFAULT_MOVIES_PATH, model_path=DEFAULT_MODEL_PATH):
+        movielens_dataset = MovieLens(ratings_path)
         num_users, num_movies = movielens_dataset.size
         embedding_size = 200
         self.movielens = movielens_dataset
@@ -15,8 +17,8 @@ class SimilarMovies:
                                          num_movies,
                                          embedding_size)
 
-        load_model(self.model, '/home/chris/PycharmProjects/recommender_movie_lens/recommender_model.pth')
-        self.movies = pd.read_csv("/home/chris/PycharmProjects/recommender_movie_lens/ml-25m/movies.csv")
+        load_model(self.model, model_path)
+        self.movies = pd.read_csv(movies_path)
 
     def get_similar(self, target_movie_id, top_n=5):
         target_movie_id = self.movielens.movie_map[target_movie_id]
@@ -48,7 +50,13 @@ class SimilarMovies:
 
 
 if __name__ == "__main__":
-    finder = SimilarMovies()
+    parser = argparse.ArgumentParser(description="Find movies with similar embeddings.")
+    parser.add_argument("--ratings-path", default=DEFAULT_RATINGS_PATH, help="Path to ratings.csv.")
+    parser.add_argument("--movies-path", default=DEFAULT_MOVIES_PATH, help="Path to movies.csv.")
+    parser.add_argument("--model-path", default=DEFAULT_MODEL_PATH, help="Path to recommender_model.pth.")
+    args = parser.parse_args()
+
+    finder = SimilarMovies(args.ratings_path, args.movies_path, args.model_path)
     ids = [
         116797,  # The Imitation Game (2014)
         7153,  # Lord of the Rings: The Return of the King, The (2003)
