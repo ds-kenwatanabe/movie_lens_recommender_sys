@@ -91,6 +91,14 @@ as positives and sampled non-interacted movies are treated as negatives. CLI
 arguments can override the dataset, movie metadata, model paths, and evaluation
 settings.
 
+Training supports two modes:
+
+```bash
+python -m recommender.train --training-mode explicit --explicit-loss mse
+python -m recommender.train --training-mode implicit --implicit-loss bce
+python -m recommender.train --training-mode implicit --implicit-loss bpr
+```
+
 Training saves resumable checkpoints at `--model-path`. A checkpoint contains
 model weights, optimizer state, epoch, validation metrics, user/movie ID
 mappings, and the training config. Resume with `--resume-from path/to/checkpoint`.
@@ -106,9 +114,9 @@ PYTHONPATH=src python -m unittest discover -s tests
 ## Notes
 
 The model scores user/movie pairs with user bias, movie bias, and the dot
-product of user/movie embeddings. Training uses binary cross entropy over
-positive interactions and sampled negatives, optimized with Adam and weight
-decay regularization. Validation reports MAE, RMSE, Precision@K, Recall@K,
+product of user/movie embeddings. Explicit mode predicts ratings with MSE or
+MAE. Implicit mode predicts relevance with BCE over sampled negatives or BPR
+pairwise ranking loss. Validation reports MAE, RMSE, Precision@K, Recall@K,
 NDCG@K, HitRate@K, and catalog coverage. Training and ranking evaluation on the
 full MovieLens 25M dataset can take significant time depending on hardware.
 

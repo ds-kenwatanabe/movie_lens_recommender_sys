@@ -4,6 +4,9 @@ movies_path: ml-25m/movies.csv
 model_path: recommender_model.pth
 batch_size: 4096
 embedding_size: 200
+training_mode: implicit
+explicit_loss: mse
+implicit_loss: bce
 learning_rate: 0.0001
 weight_decay: 0.00001
 epochs: 20

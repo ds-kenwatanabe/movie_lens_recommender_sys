@@ -7,6 +7,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 from recommender.train import (  # noqa: E402
+    build_bpr_samples,
     build_implicit_feedback_samples,
     temporal_split_indices,
 )
@@ -68,6 +69,32 @@ class NegativeSamplingTests(unittest.TestCase):
         )
         self.assertTrue(
             all(movie_id != 2 for user_id, movie_id in negatives if user_id == 1)
+        )
+
+    def test_bpr_samples_pair_positives_with_sampled_negatives(self):
+        import pandas as pd
+
+        data = pd.DataFrame(
+            {
+                "normalized_user_id": [0, 0, 1],
+                "normalized_movie_id": [0, 1, 2],
+                "rating": [5.0, 3.0, 4.5],
+            }
+        )
+
+        samples = build_bpr_samples(
+            data,
+            positive_indices=[0, 1, 2],
+            num_movies=4,
+            relevance_threshold=4.0,
+            negatives_per_positive=1,
+            seed=42,
+        )
+
+        self.assertEqual(len(samples), 2)
+        self.assertTrue(all(len(sample) == 3 for sample in samples))
+        self.assertEqual(
+            {(user_id, positive) for user_id, positive, _ in samples}, {(0, 0), (1, 2)}
         )
 
 

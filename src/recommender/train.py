@@ -59,6 +59,45 @@ def build_implicit_feedback_samples(
     return samples
 
 
+def build_bpr_samples(
+    data,
+    positive_indices,
+    num_movies,
+    relevance_threshold,
+    negatives_per_positive,
+    seed,
+):
+    implicit_samples = build_implicit_feedback_samples(
+        data,
+        positive_indices,
+        num_movies,
+        relevance_threshold,
+        negatives_per_positive,
+        seed,
+    )
+    positives = [
+        (user_id, movie_id)
+        for user_id, movie_id, label in implicit_samples
+        if label == 1.0
+    ]
+    negatives_by_user = {}
+    for user_id, movie_id, label in implicit_samples:
+        if label == 0.0:
+            negatives_by_user.setdefault(user_id, []).append(movie_id)
+
+    samples = []
+    for user_id, positive_movie_id in positives:
+        for negative_movie_id in negatives_by_user.get(user_id, []):
+            samples.append((user_id, positive_movie_id, negative_movie_id))
+
+    if not samples:
+        raise ValueError(
+            "No BPR samples were created. Check relevance threshold and negative sampling."
+        )
+
+    return samples
+
+
 def temporal_split_indices(timestamps, val_ratio):
     if not 0.0 < val_ratio < 1.0:
         raise ValueError("--val-ratio must be between 0 and 1")
@@ -87,6 +126,24 @@ def parse_args():
     )
     parser.add_argument("--batch-size", type=int, default=4096)
     parser.add_argument("--embedding-size", type=int, default=200)
+    parser.add_argument(
+        "--training-mode",
+        choices=["explicit", "implicit"],
+        default="implicit",
+        help="Train for explicit rating prediction or implicit relevance ranking.",
+    )
+    parser.add_argument(
+        "--explicit-loss",
+        choices=["mse", "mae"],
+        default="mse",
+        help="Loss for explicit rating prediction.",
+    )
+    parser.add_argument(
+        "--implicit-loss",
+        choices=["bce", "bpr"],
+        default="bce",
+        help="Loss for implicit relevance training.",
+    )
     parser.add_argument("--learning-rate", type=float, default=1e-4)
     parser.add_argument(
         "--weight-decay",
@@ -134,7 +191,7 @@ def main():
     import numpy as np
     import torch
     from torch import optim
-    from torch.utils.data import DataLoader, TensorDataset
+    from torch.utils.data import DataLoader, Subset, TensorDataset
     from tqdm import tqdm
 
     from recommender.data import MovieLens
@@ -155,34 +212,64 @@ def main():
         movielens.data["timestamp"].tolist(), args.val_ratio
     )
     num_users, num_movies = movielens.size
-    train_samples = build_implicit_feedback_samples(
-        movielens.data,
-        train_indices,
-        num_movies,
-        args.relevance_threshold,
-        args.negatives_per_positive,
-        args.seed,
-    )
-    val_samples = build_implicit_feedback_samples(
-        movielens.data,
-        val_indices,
-        num_movies,
-        args.relevance_threshold,
-        args.negatives_per_positive,
-        args.seed + 1,
-    )
-    train_users, train_movies, train_labels = zip(*train_samples)
-    val_users, val_movies, val_labels = zip(*val_samples)
-    train_dataset = TensorDataset(
-        torch.LongTensor(train_users),
-        torch.LongTensor(train_movies),
-        torch.FloatTensor(train_labels),
-    )
-    val_dataset = TensorDataset(
-        torch.LongTensor(val_users),
-        torch.LongTensor(val_movies),
-        torch.FloatTensor(val_labels),
-    )
+
+    if args.training_mode == "explicit":
+        train_dataset = Subset(movielens, train_indices)
+        val_dataset = Subset(movielens, val_indices)
+        model_global_mean = movielens.global_mean
+        if args.explicit_loss == "mse":
+            loss_fn = torch.nn.MSELoss().to(device)
+        else:
+            loss_fn = torch.nn.L1Loss().to(device)
+    else:
+        val_samples = build_implicit_feedback_samples(
+            movielens.data,
+            val_indices,
+            num_movies,
+            args.relevance_threshold,
+            args.negatives_per_positive,
+            args.seed + 1,
+        )
+        val_users, val_movies, val_labels = zip(*val_samples)
+        val_dataset = TensorDataset(
+            torch.LongTensor(val_users),
+            torch.LongTensor(val_movies),
+            torch.FloatTensor(val_labels),
+        )
+        model_global_mean = 0.0
+        if args.implicit_loss == "bce":
+            train_samples = build_implicit_feedback_samples(
+                movielens.data,
+                train_indices,
+                num_movies,
+                args.relevance_threshold,
+                args.negatives_per_positive,
+                args.seed,
+            )
+            train_users, train_movies, train_labels = zip(*train_samples)
+            train_dataset = TensorDataset(
+                torch.LongTensor(train_users),
+                torch.LongTensor(train_movies),
+                torch.FloatTensor(train_labels),
+            )
+            loss_fn = torch.nn.BCEWithLogitsLoss().to(device)
+        else:
+            bpr_samples = build_bpr_samples(
+                movielens.data,
+                train_indices,
+                num_movies,
+                args.relevance_threshold,
+                args.negatives_per_positive,
+                args.seed,
+            )
+            train_users, positive_movies, negative_movies = zip(*bpr_samples)
+            train_dataset = TensorDataset(
+                torch.LongTensor(train_users),
+                torch.LongTensor(positive_movies),
+                torch.LongTensor(negative_movies),
+            )
+            loss_fn = None
+
     shuffle_generator = torch.Generator().manual_seed(args.seed)
 
     train_dataloader = DataLoader(
@@ -197,10 +284,9 @@ def main():
         num_users=num_users,
         num_movies=num_movies,
         embedding_size=args.embedding_size,
-        global_mean=0.0,
+        global_mean=model_global_mean,
     ).to(device)
 
-    loss_fn = torch.nn.BCEWithLogitsLoss().to(device)
     optimizer = optim.Adam(
         model.parameters(), lr=args.learning_rate, weight_decay=args.weight_decay
     )
@@ -223,13 +309,26 @@ def main():
 
         model.train()
         train_loop = tqdm(enumerate(train_dataloader), total=len(train_dataloader))
-        for i, (user_id, movies_id, ratings) in train_loop:
-            user_id = user_id.view(-1).to(device)
-            movies_id = movies_id.view(-1).to(device)
-            ratings = ratings.view(-1).to(device)
+        for i, batch in train_loop:
+            if args.training_mode == "implicit" and args.implicit_loss == "bpr":
+                user_id, positive_movie_id, negative_movie_id = batch
+                user_id = user_id.view(-1).to(device)
+                positive_movie_id = positive_movie_id.view(-1).to(device)
+                negative_movie_id = negative_movie_id.view(-1).to(device)
 
-            preds = model(user_id, movies_id)
-            loss = loss_fn(preds, ratings)
+                positive_scores = model(user_id, positive_movie_id)
+                negative_scores = model(user_id, negative_movie_id)
+                loss = -torch.nn.functional.logsigmoid(
+                    positive_scores - negative_scores
+                ).mean()
+            else:
+                user_id, movies_id, ratings = batch
+                user_id = user_id.view(-1).to(device)
+                movies_id = movies_id.view(-1).to(device)
+                ratings = ratings.view(-1).to(device)
+
+                preds = model(user_id, movies_id)
+                loss = loss_fn(preds, ratings)
 
             optimizer.zero_grad()
             loss.backward()
@@ -246,8 +345,10 @@ def main():
             val_dataloader,
             device,
             k=args.eval_k,
-            relevance_threshold=0.5,
-            implicit_feedback=True,
+            relevance_threshold=(
+                0.5 if args.training_mode == "implicit" else args.relevance_threshold
+            ),
+            implicit_feedback=args.training_mode == "implicit",
         )
         print(
             "Validation Metrics: "
