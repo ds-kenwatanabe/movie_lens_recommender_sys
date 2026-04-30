@@ -4,7 +4,6 @@ import sys
 import tempfile
 import unittest
 
-
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
@@ -37,9 +36,15 @@ class CheckpointTests(unittest.TestCase):
                 config=config,
             )
 
-            restored_model = MatrixFactorization(num_users=2, num_movies=3, embedding_size=4)
-            restored_optimizer = torch.optim.Adam(restored_model.parameters(), lr=0.01, weight_decay=0.001)
-            checkpoint = load_checkpoint(checkpoint_path, restored_model, restored_optimizer)
+            restored_model = MatrixFactorization(
+                num_users=2, num_movies=3, embedding_size=4
+            )
+            restored_optimizer = torch.optim.Adam(
+                restored_model.parameters(), lr=0.01, weight_decay=0.001
+            )
+            checkpoint = load_checkpoint(
+                checkpoint_path, restored_model, restored_optimizer
+            )
 
         self.assertEqual(checkpoint["epoch"], 2)
         self.assertEqual(checkpoint["validation_metrics"], metrics)
@@ -50,4 +55,3 @@ class CheckpointTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

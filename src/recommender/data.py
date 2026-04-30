@@ -33,8 +33,12 @@ class MovieLens(Dataset):
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Preview MovieLens ratings data.")
-    parser.add_argument("--ratings-path", default=DEFAULT_RATINGS_PATH, help="Path to ratings.csv.")
-    parser.add_argument("--rows", type=int, default=10, help="Number of rows to display.")
+    parser.add_argument(
+        "--ratings-path", default=DEFAULT_RATINGS_PATH, help="Path to ratings.csv."
+    )
+    parser.add_argument(
+        "--rows", type=int, default=10, help="Number of rows to display."
+    )
     return parser.parse_args()
 
 

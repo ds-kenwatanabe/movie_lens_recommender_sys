@@ -3,7 +3,6 @@ from pathlib import Path
 import sys
 import unittest
 
-
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
@@ -17,19 +16,22 @@ class RecommendationTests(unittest.TestCase):
 
         recommender = object.__new__(MovieRecommender)
         recommender.movielens = type("MovieLensStub", (), {"movies": [10, 20]})()
-        recommender.movies = pd.DataFrame({
-            "movieId": [10, 20],
-            "title": ["A", "B"],
-            "genres": ["Action|Drama", "Comedy"],
-        })
+        recommender.movies = pd.DataFrame(
+            {
+                "movieId": [10, 20],
+                "title": ["A", "B"],
+                "genres": ["Action|Drama", "Comedy"],
+            }
+        )
 
         self.assertTrue(recommender._genre_matches(0, "Drama"))
         self.assertFalse(recommender._genre_matches(1, "Drama"))
 
-    @unittest.skipIf(importlib.util.find_spec("torch") is None, "torch is not installed")
+    @unittest.skipIf(
+        importlib.util.find_spec("torch") is None, "torch is not installed"
+    )
     def test_recommend_for_user_excludes_interacted_movies(self):
         import pandas as pd
-        import torch
 
         from recommender.recommend import MovieRecommender
 
@@ -45,17 +47,21 @@ class RecommendationTests(unittest.TestCase):
             {
                 "user_map": {123: 0},
                 "movies": [10, 20, 30],
-                "data": pd.DataFrame({
-                    "normalized_user_id": [0],
-                    "normalized_movie_id": [1],
-                }),
+                "data": pd.DataFrame(
+                    {
+                        "normalized_user_id": [0],
+                        "normalized_movie_id": [1],
+                    }
+                ),
             },
         )()
-        recommender.movies = pd.DataFrame({
-            "movieId": [10, 20, 30],
-            "title": ["A", "B", "C"],
-            "genres": ["Action", "Action", "Action"],
-        })
+        recommender.movies = pd.DataFrame(
+            {
+                "movieId": [10, 20, 30],
+                "title": ["A", "B", "C"],
+                "genres": ["Action", "Action", "Action"],
+            }
+        )
 
         recommendations = recommender.recommend_for_user(123, top_k=3)
 

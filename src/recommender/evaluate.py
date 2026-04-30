@@ -11,20 +11,27 @@ def _ndcg_at_k(recommended_movies, relevant_movies, k):
     if ideal_hits == 0:
         return 0.0
 
-    idcg = sum(1.0 / torch.log2(torch.tensor(rank + 1.0)).item() for rank in range(1, ideal_hits + 1))
+    idcg = sum(
+        1.0 / torch.log2(torch.tensor(rank + 1.0)).item()
+        for rank in range(1, ideal_hits + 1)
+    )
     return dcg / idcg
 
 
 def _rank_movies_for_user(model, user_id, candidate_movie_ids, k, device):
     movie_ids = torch.tensor(candidate_movie_ids, dtype=torch.long, device=device)
-    user_ids = torch.full((len(candidate_movie_ids),), user_id, dtype=torch.long, device=device)
+    user_ids = torch.full(
+        (len(candidate_movie_ids),), user_id, dtype=torch.long, device=device
+    )
     scores = model(user_ids, movie_ids)
     top_k = min(k, len(candidate_movie_ids))
     top_positions = torch.topk(scores, k=top_k).indices.cpu().tolist()
     return [candidate_movie_ids[position] for position in top_positions]
 
 
-def evaluate_model(model, dataloader, device, k=10, relevance_threshold=4.0, implicit_feedback=False):
+def evaluate_model(
+    model, dataloader, device, k=10, relevance_threshold=4.0, implicit_feedback=False
+):
     if k < 1:
         raise ValueError("k must be at least 1")
 
@@ -54,14 +61,16 @@ def evaluate_model(model, dataloader, device, k=10, relevance_threshold=4.0, imp
             ):
                 candidates_by_user.setdefault(batch_user_id, set()).add(batch_movie_id)
                 if batch_rating >= relevance_threshold:
-                    relevant_by_user.setdefault(batch_user_id, set()).add(batch_movie_id)
+                    relevant_by_user.setdefault(batch_user_id, set()).add(
+                        batch_movie_id
+                    )
 
         predictions = torch.cat(predictions)
         targets = torch.cat(targets)
         errors = predictions - targets
 
         mae = torch.mean(torch.abs(errors)).item()
-        rmse = torch.sqrt(torch.mean(errors ** 2)).item()
+        rmse = torch.sqrt(torch.mean(errors**2)).item()
 
         num_movies = model.movie_embedding.num_embeddings
         recommended_movies = set()
@@ -72,7 +81,9 @@ def evaluate_model(model, dataloader, device, k=10, relevance_threshold=4.0, imp
 
         for user_id, relevant_movies in relevant_by_user.items():
             candidate_movie_ids = sorted(candidates_by_user[user_id])
-            top_movies = _rank_movies_for_user(model, user_id, candidate_movie_ids, k, device)
+            top_movies = _rank_movies_for_user(
+                model, user_id, candidate_movie_ids, k, device
+            )
             recommended_movies.update(top_movies)
             hits = len(set(top_movies) & relevant_movies)
 
@@ -84,8 +95,12 @@ def evaluate_model(model, dataloader, device, k=10, relevance_threshold=4.0, imp
     return {
         "mae": mae,
         "rmse": rmse,
-        f"precision@{k}": sum(precision_scores) / len(precision_scores) if precision_scores else 0.0,
-        f"recall@{k}": sum(recall_scores) / len(recall_scores) if recall_scores else 0.0,
+        f"precision@{k}": (
+            sum(precision_scores) / len(precision_scores) if precision_scores else 0.0
+        ),
+        f"recall@{k}": (
+            sum(recall_scores) / len(recall_scores) if recall_scores else 0.0
+        ),
         f"ndcg@{k}": sum(ndcg_scores) / len(ndcg_scores) if ndcg_scores else 0.0,
         f"hitrate@{k}": sum(hit_scores) / len(hit_scores) if hit_scores else 0.0,
         "coverage": len(recommended_movies) / num_movies if num_movies else 0.0,

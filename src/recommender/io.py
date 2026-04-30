@@ -40,7 +40,9 @@ def load_model(model, filepath, device="cpu"):
     return f"Model loaded from: {filepath}"
 
 
-def load_checkpoint(filepath: str, model: torch.nn.Module, optimizer=None, device="cpu"):
+def load_checkpoint(
+    filepath: str, model: torch.nn.Module, optimizer=None, device="cpu"
+):
     checkpoint = torch.load(filepath, map_location=device)
     if "model_state_dict" not in checkpoint:
         raise ValueError("Checkpoint does not contain resumable training state")

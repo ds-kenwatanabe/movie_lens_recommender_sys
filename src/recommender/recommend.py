@@ -1,7 +1,10 @@
 import argparse
 
-from recommender.config import DEFAULT_MODEL_PATH, DEFAULT_MOVIES_PATH, DEFAULT_RATINGS_PATH
-
+from recommender.config import (
+    DEFAULT_MODEL_PATH,
+    DEFAULT_MOVIES_PATH,
+    DEFAULT_RATINGS_PATH,
+)
 
 DEFAULT_SAMPLE_MOVIE_IDS = [
     116797,  # The Imitation Game (2014)
@@ -42,7 +45,9 @@ class MovieRecommender:
         load_model(self.model, model_path)
         self.movies = pd.read_csv(movies_path)
         self.model.eval()
-        self.movie_embeddings = torch.nn.functional.normalize(self.model.movie_embedding.weight.detach(), p=2, dim=1)
+        self.movie_embeddings = torch.nn.functional.normalize(
+            self.model.movie_embedding.weight.detach(), p=2, dim=1
+        )
         self._annoy_index = None
 
     def _genre_matches(self, movie_index, genre):
@@ -63,7 +68,8 @@ class MovieRecommender:
         return [
             movie_index
             for movie_index in ranked_indices
-            if movie_index != target_movie_index and self._genre_matches(movie_index, genre)
+            if movie_index != target_movie_index
+            and self._genre_matches(movie_index, genre)
         ][:top_n]
 
     def _annoy_neighbors(self, target_movie_index, top_n, search_k=-1, genre=None):
@@ -80,20 +86,29 @@ class MovieRecommender:
             self._annoy_index.build(10)
 
         candidate_count = min(len(embeddings), max(top_n * 20, top_n + 1))
-        candidates = self._annoy_index.get_nns_by_item(target_movie_index, candidate_count, search_k=search_k)
+        candidates = self._annoy_index.get_nns_by_item(
+            target_movie_index, candidate_count, search_k=search_k
+        )
         return [
             movie_index
             for movie_index in candidates
-            if movie_index != target_movie_index and self._genre_matches(movie_index, genre)
+            if movie_index != target_movie_index
+            and self._genre_matches(movie_index, genre)
         ][:top_n]
 
-    def get_similar(self, target_movie_id, top_n=5, genre=None, use_annoy=False, search_k=-1):
+    def get_similar(
+        self, target_movie_id, top_n=5, genre=None, use_annoy=False, search_k=-1
+    ):
         target_movie_index = self.movielens.movie_map[target_movie_id]
         similar_movie_indices = None
         if use_annoy:
-            similar_movie_indices = self._annoy_neighbors(target_movie_index, top_n, search_k=search_k, genre=genre)
+            similar_movie_indices = self._annoy_neighbors(
+                target_movie_index, top_n, search_k=search_k, genre=genre
+            )
         if similar_movie_indices is None:
-            similar_movie_indices = self._exact_cosine_neighbors(target_movie_index, top_n, genre=genre)
+            similar_movie_indices = self._exact_cosine_neighbors(
+                target_movie_index, top_n, genre=genre
+            )
 
         self.display_similar_movies(target_movie_index, similar_movie_indices)
 
@@ -105,20 +120,23 @@ class MovieRecommender:
 
         normalized_user_id = self.movielens.user_map[user_id]
         interacted_movies = set(
-            self.movielens.data[self.movielens.data["normalized_user_id"] == normalized_user_id][
-                "normalized_movie_id"
-            ].tolist()
+            self.movielens.data[
+                self.movielens.data["normalized_user_id"] == normalized_user_id
+            ]["normalized_movie_id"].tolist()
         )
         candidate_movie_indices = [
             movie_index
             for movie_index in range(len(self.movielens.movies))
-            if movie_index not in interacted_movies and self._genre_matches(movie_index, genre)
+            if movie_index not in interacted_movies
+            and self._genre_matches(movie_index, genre)
         ]
         if not candidate_movie_indices:
             return []
 
         movie_ids = torch.LongTensor(candidate_movie_indices)
-        user_ids = torch.full((len(candidate_movie_indices),), normalized_user_id, dtype=torch.long)
+        user_ids = torch.full(
+            (len(candidate_movie_indices),), normalized_user_id, dtype=torch.long
+        )
         with torch.no_grad():
             scores = self.model(user_ids, movie_ids)
 
@@ -135,12 +153,16 @@ class MovieRecommender:
         return {
             "Movie ID": [movie_id],
             "Title": self.movies[self.movies["movieId"] == movie_id]["title"].values[0],
-            "Genre": self.movies[self.movies["movieId"] == movie_id]["genres"].values[0],
+            "Genre": self.movies[self.movies["movieId"] == movie_id]["genres"].values[
+                0
+            ],
         }
 
     def display_similar_movies(self, movie_id, similar_ids):
         main_title = self.movie_info(movie_id)
-        print(f'Top {len(similar_ids)} most similar movies to {main_title["Title"]} [{main_title["Genre"]}]')
+        print(
+            f'Top {len(similar_ids)} most similar movies to {main_title["Title"]} [{main_title["Genre"]}]'
+        )
 
         for id in similar_ids:
             title = self.movie_info(id)
@@ -151,24 +173,52 @@ class MovieRecommender:
 
         for movie_index, score in recommendations:
             title = self.movie_info(movie_index)
-            print(f'- [{title["Movie ID"][0]}] {title["Title"]} [{title["Genre"]}] score={score:.4f}')
+            print(
+                f'- [{title["Movie ID"][0]}] {title["Title"]} [{title["Genre"]}] score={score:.4f}'
+            )
 
 
 SimilarMovies = MovieRecommender
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Recommend movies or find similar movies.")
-    parser.add_argument("--ratings-path", default=DEFAULT_RATINGS_PATH, help="Path to ratings.csv.")
-    parser.add_argument("--movies-path", default=DEFAULT_MOVIES_PATH, help="Path to movies.csv.")
-    parser.add_argument("--model-path", default=DEFAULT_MODEL_PATH, help="Path to recommender_model.pth.")
-    parser.add_argument("--user-id", type=int, default=None, help="User ID to generate top-K recommendations for.")
+    parser = argparse.ArgumentParser(
+        description="Recommend movies or find similar movies."
+    )
+    parser.add_argument(
+        "--ratings-path", default=DEFAULT_RATINGS_PATH, help="Path to ratings.csv."
+    )
+    parser.add_argument(
+        "--movies-path", default=DEFAULT_MOVIES_PATH, help="Path to movies.csv."
+    )
+    parser.add_argument(
+        "--model-path",
+        default=DEFAULT_MODEL_PATH,
+        help="Path to recommender_model.pth.",
+    )
+    parser.add_argument(
+        "--user-id",
+        type=int,
+        default=None,
+        help="User ID to generate top-K recommendations for.",
+    )
     parser.add_argument("--movie-id", type=int, nargs="*", default=None)
     parser.add_argument("--top-n", type=int, default=5)
     parser.add_argument("--top-k", type=int, default=10)
-    parser.add_argument("--genre", default=None, help="Only return movies containing this genre.")
-    parser.add_argument("--use-annoy", action="store_true", help="Use Annoy approximate nearest-neighbor search.")
-    parser.add_argument("--search-k", type=int, default=-1, help="Annoy search_k value; -1 uses Annoy default.")
+    parser.add_argument(
+        "--genre", default=None, help="Only return movies containing this genre."
+    )
+    parser.add_argument(
+        "--use-annoy",
+        action="store_true",
+        help="Use Annoy approximate nearest-neighbor search.",
+    )
+    parser.add_argument(
+        "--search-k",
+        type=int,
+        default=-1,
+        help="Annoy search_k value; -1 uses Annoy default.",
+    )
     return parser.parse_args()
 
 
@@ -192,8 +242,12 @@ def main():
 
 def preview_movie_ids_main():
     parser = argparse.ArgumentParser(description="Preview MovieLens movie IDs.")
-    parser.add_argument("--movies-path", default=DEFAULT_MOVIES_PATH, help="Path to movies.csv.")
-    parser.add_argument("--rows", type=int, default=5, help="Number of rows to display.")
+    parser.add_argument(
+        "--movies-path", default=DEFAULT_MOVIES_PATH, help="Path to movies.csv."
+    )
+    parser.add_argument(
+        "--rows", type=int, default=5, help="Number of rows to display."
+    )
     args = parser.parse_args()
 
     import pandas as pd

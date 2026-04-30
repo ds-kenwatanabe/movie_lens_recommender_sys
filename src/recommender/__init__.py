@@ -21,7 +21,9 @@ def __getattr__(name):
     if name in {"MovieRecommender", "SimilarMovies"}:
         from recommender.recommend import MovieRecommender, SimilarMovies
 
-        return {"MovieRecommender": MovieRecommender, "SimilarMovies": SimilarMovies}[name]
+        return {"MovieRecommender": MovieRecommender, "SimilarMovies": SimilarMovies}[
+            name
+        ]
     if name == "compare_baselines":
         from recommender.baselines import compare_baselines
 

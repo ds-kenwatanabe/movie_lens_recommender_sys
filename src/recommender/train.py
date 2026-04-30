@@ -6,7 +6,9 @@ from recommender.config import DEFAULT_MODEL_PATH, DEFAULT_RATINGS_PATH
 
 def build_user_interactions(data):
     interactions = {}
-    for user_id, movie_id in zip(data["normalized_user_id"], data["normalized_movie_id"]):
+    for user_id, movie_id in zip(
+        data["normalized_user_id"], data["normalized_movie_id"]
+    ):
         interactions.setdefault(int(user_id), set()).add(int(movie_id))
     return interactions
 
@@ -36,7 +38,9 @@ def build_implicit_feedback_samples(
         movie_id = int(row["normalized_movie_id"])
         samples.append((user_id, movie_id, 1.0))
 
-        candidate_negatives = list(all_movie_ids - interactions_by_user.get(user_id, set()))
+        candidate_negatives = list(
+            all_movie_ids - interactions_by_user.get(user_id, set())
+        )
         if not candidate_negatives:
             continue
 
@@ -48,7 +52,9 @@ def build_implicit_feedback_samples(
             samples.append((user_id, negative_movie_id, 0.0))
 
     if not samples:
-        raise ValueError("No implicit feedback samples were created. Lower --relevance-threshold or check the data.")
+        raise ValueError(
+            "No implicit feedback samples were created. Lower --relevance-threshold or check the data."
+        )
 
     return samples
 
@@ -71,19 +77,52 @@ def temporal_split_indices(timestamps, val_ratio):
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Train the MovieLens recommender.")
-    parser.add_argument("--ratings-path", default=DEFAULT_RATINGS_PATH, help="Path to ratings.csv.")
-    parser.add_argument("--model-path", default=DEFAULT_MODEL_PATH, help="Where to save the trained model.")
+    parser.add_argument(
+        "--ratings-path", default=DEFAULT_RATINGS_PATH, help="Path to ratings.csv."
+    )
+    parser.add_argument(
+        "--model-path",
+        default=DEFAULT_MODEL_PATH,
+        help="Where to save the trained model.",
+    )
     parser.add_argument("--batch-size", type=int, default=4096)
     parser.add_argument("--embedding-size", type=int, default=200)
     parser.add_argument("--learning-rate", type=float, default=1e-4)
-    parser.add_argument("--weight-decay", type=float, default=1e-5, help="Adam weight decay for L2 regularization.")
-    parser.add_argument("--epochs", type=int, default=20, help="Might take a day or more depending on hardware.")
+    parser.add_argument(
+        "--weight-decay",
+        type=float,
+        default=1e-5,
+        help="Adam weight decay for L2 regularization.",
+    )
+    parser.add_argument(
+        "--epochs",
+        type=int,
+        default=20,
+        help="Might take a day or more depending on hardware.",
+    )
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--val-ratio", type=float, default=0.2)
-    parser.add_argument("--eval-k", type=int, default=10, help="K for ranking metrics such as Precision@K.")
-    parser.add_argument("--relevance-threshold", type=float, default=4.0, help="Minimum rating treated as relevant.")
-    parser.add_argument("--negatives-per-positive", type=int, default=4, help="Negative samples per positive rating.")
-    parser.add_argument("--resume-from", default=None, help="Path to a training checkpoint to resume.")
+    parser.add_argument(
+        "--eval-k",
+        type=int,
+        default=10,
+        help="K for ranking metrics such as Precision@K.",
+    )
+    parser.add_argument(
+        "--relevance-threshold",
+        type=float,
+        default=4.0,
+        help="Minimum rating treated as relevant.",
+    )
+    parser.add_argument(
+        "--negatives-per-positive",
+        type=int,
+        default=4,
+        help="Negative samples per positive rating.",
+    )
+    parser.add_argument(
+        "--resume-from", default=None, help="Path to a training checkpoint to resume."
+    )
     return parser.parse_args()
 
 
@@ -108,9 +147,13 @@ def main():
     movielens = MovieLens(args.ratings_path)
 
     if "timestamp" not in movielens.data.columns:
-        raise ValueError("Temporal split requires a timestamp column in the ratings data")
+        raise ValueError(
+            "Temporal split requires a timestamp column in the ratings data"
+        )
 
-    train_indices, val_indices = temporal_split_indices(movielens.data["timestamp"].tolist(), args.val_ratio)
+    train_indices, val_indices = temporal_split_indices(
+        movielens.data["timestamp"].tolist(), args.val_ratio
+    )
     num_users, num_movies = movielens.size
     train_samples = build_implicit_feedback_samples(
         movielens.data,
@@ -142,7 +185,12 @@ def main():
     )
     shuffle_generator = torch.Generator().manual_seed(args.seed)
 
-    train_dataloader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, generator=shuffle_generator)
+    train_dataloader = DataLoader(
+        train_dataset,
+        batch_size=args.batch_size,
+        shuffle=True,
+        generator=shuffle_generator,
+    )
     val_dataloader = DataLoader(val_dataset, batch_size=args.batch_size)
 
     model = MatrixFactorization(
@@ -153,7 +201,9 @@ def main():
     ).to(device)
 
     loss_fn = torch.nn.BCEWithLogitsLoss().to(device)
-    optimizer = optim.Adam(model.parameters(), lr=args.learning_rate, weight_decay=args.weight_decay)
+    optimizer = optim.Adam(
+        model.parameters(), lr=args.learning_rate, weight_decay=args.weight_decay
+    )
     min_val_loss = np.inf
     start_epoch = 0
     training_history = []
@@ -206,11 +256,13 @@ def main():
 
         if metrics["mae"] < min_val_loss:
             min_val_loss = metrics["mae"]
-        training_history.append({
-            "epoch": epoch + 1,
-            "train_loss": running_loss,
-            "validation_metrics": metrics,
-        })
+        training_history.append(
+            {
+                "epoch": epoch + 1,
+                "train_loss": running_loss,
+                "validation_metrics": metrics,
+            }
+        )
         save_checkpoint(
             args.model_path,
             model=model,

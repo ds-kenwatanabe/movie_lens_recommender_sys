@@ -3,7 +3,6 @@ from pathlib import Path
 import sys
 import unittest
 
-
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
@@ -22,10 +21,12 @@ class EvaluationMetricTests(unittest.TestCase):
             movie_embedding = DummyEmbedding()
 
             def __init__(self):
-                self.scores = torch.tensor([
-                    [0.1, 0.9, 0.8],
-                    [0.7, 0.2, 0.1],
-                ])
+                self.scores = torch.tensor(
+                    [
+                        [0.1, 0.9, 0.8],
+                        [0.7, 0.2, 0.1],
+                    ]
+                )
 
             def eval(self):
                 return self
@@ -41,17 +42,22 @@ class EvaluationMetricTests(unittest.TestCase):
             )
         ]
 
-        metrics = evaluate_model(DummyModel(), dataloader, device="cpu", k=2, relevance_threshold=4.0)
+        metrics = evaluate_model(
+            DummyModel(), dataloader, device="cpu", k=2, relevance_threshold=4.0
+        )
 
-        self.assertEqual(set(metrics), {
-            "mae",
-            "rmse",
-            "precision@2",
-            "recall@2",
-            "ndcg@2",
-            "hitrate@2",
-            "coverage",
-        })
+        self.assertEqual(
+            set(metrics),
+            {
+                "mae",
+                "rmse",
+                "precision@2",
+                "recall@2",
+                "ndcg@2",
+                "hitrate@2",
+                "coverage",
+            },
+        )
         self.assertAlmostEqual(metrics["precision@2"], 0.5)
         self.assertAlmostEqual(metrics["recall@2"], 1.0)
         self.assertAlmostEqual(metrics["ndcg@2"], 1.0)
@@ -61,4 +67,3 @@ class EvaluationMetricTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

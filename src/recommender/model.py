@@ -5,6 +5,7 @@ The model learns latent embeddings and bias terms for users and movies, then
 predicts a rating from the global mean, user bias, movie bias, and dot product
 of the matching user and movie vectors.
 """
+
 import torch
 from torch import nn
 
@@ -26,5 +27,10 @@ class MatrixFactorization(nn.Module):
         movie_emb = self.movie_embedding(movie_idx)
         user_bias = self.user_bias(user_idx).squeeze(-1)
         movie_bias = self.movie_bias(movie_idx).squeeze(-1)
-        rating = self.global_mean + user_bias + movie_bias + torch.sum(user_emb * movie_emb, dim=1)
+        rating = (
+            self.global_mean
+            + user_bias
+            + movie_bias
+            + torch.sum(user_emb * movie_emb, dim=1)
+        )
         return rating

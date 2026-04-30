@@ -3,11 +3,13 @@ import importlib.util
 import sys
 import unittest
 
-
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
-from recommender.train import build_implicit_feedback_samples, temporal_split_indices  # noqa: E402
+from recommender.train import (  # noqa: E402
+    build_implicit_feedback_samples,
+    temporal_split_indices,
+)
 
 
 class TemporalSplitTests(unittest.TestCase):
@@ -26,14 +28,18 @@ class TemporalSplitTests(unittest.TestCase):
 
 @unittest.skipIf(importlib.util.find_spec("pandas") is None, "pandas is not installed")
 class NegativeSamplingTests(unittest.TestCase):
-    def test_negative_sampling_uses_high_ratings_as_positives_and_unseen_movies_as_negatives(self):
+    def test_negative_sampling_uses_high_ratings_as_positives_and_unseen_movies_as_negatives(
+        self,
+    ):
         import pandas as pd
 
-        data = pd.DataFrame({
-            "normalized_user_id": [0, 0, 1],
-            "normalized_movie_id": [0, 1, 2],
-            "rating": [5.0, 3.0, 4.5],
-        })
+        data = pd.DataFrame(
+            {
+                "normalized_user_id": [0, 0, 1],
+                "normalized_movie_id": [0, 1, 2],
+                "rating": [5.0, 3.0, 4.5],
+            }
+        )
 
         samples = build_implicit_feedback_samples(
             data,
@@ -44,13 +50,25 @@ class NegativeSamplingTests(unittest.TestCase):
             seed=42,
         )
 
-        positives = {(user_id, movie_id) for user_id, movie_id, label in samples if label == 1.0}
-        negatives = {(user_id, movie_id) for user_id, movie_id, label in samples if label == 0.0}
+        positives = {
+            (user_id, movie_id) for user_id, movie_id, label in samples if label == 1.0
+        }
+        negatives = {
+            (user_id, movie_id) for user_id, movie_id, label in samples if label == 0.0
+        }
 
         self.assertEqual(positives, {(0, 0), (1, 2)})
         self.assertEqual(len(negatives), 2)
-        self.assertTrue(all(movie_id not in {0, 1} for user_id, movie_id in negatives if user_id == 0))
-        self.assertTrue(all(movie_id != 2 for user_id, movie_id in negatives if user_id == 1))
+        self.assertTrue(
+            all(
+                movie_id not in {0, 1}
+                for user_id, movie_id in negatives
+                if user_id == 0
+            )
+        )
+        self.assertTrue(
+            all(movie_id != 2 for user_id, movie_id in negatives if user_id == 1)
+        )
 
 
 if __name__ == "__main__":

@@ -3,7 +3,6 @@ from pathlib import Path
 import sys
 import unittest
 
-
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
@@ -15,7 +14,9 @@ class MatrixFactorizationTests(unittest.TestCase):
 
         from recommender.model import MatrixFactorization
 
-        model = MatrixFactorization(num_users=1, num_movies=1, embedding_size=2, global_mean=3.5)
+        model = MatrixFactorization(
+            num_users=1, num_movies=1, embedding_size=2, global_mean=3.5
+        )
         with torch.no_grad():
             model.user_embedding.weight.fill_(2.0)
             model.movie_embedding.weight.fill_(4.0)
@@ -29,4 +30,3 @@ class MatrixFactorizationTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

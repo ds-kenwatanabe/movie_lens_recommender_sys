@@ -15,7 +15,9 @@ def plot_training_history(checkpoint_path, output_dir):
 
     plt = _load_pyplot()
     checkpoint = torch.load(checkpoint_path, map_location="cpu")
-    history = checkpoint.get("training_history", []) if isinstance(checkpoint, dict) else []
+    history = (
+        checkpoint.get("training_history", []) if isinstance(checkpoint, dict) else []
+    )
     if not history:
         return None
 
@@ -97,7 +99,9 @@ def _reduce_embeddings(embeddings, method, max_points, seed):
         try:
             import umap
         except ImportError as exc:
-            raise ImportError("Install umap-learn to use --embedding-method umap") from exc
+            raise ImportError(
+                "Install umap-learn to use --embedding-method umap"
+            ) from exc
 
         reducer = umap.UMAP(n_components=2, random_state=seed)
         return reducer.fit_transform(embeddings)
@@ -105,11 +109,15 @@ def _reduce_embeddings(embeddings, method, max_points, seed):
     from sklearn.manifold import TSNE
 
     perplexity = min(30, max(2, len(embeddings) - 1))
-    reducer = TSNE(n_components=2, random_state=seed, init="random", perplexity=perplexity)
+    reducer = TSNE(
+        n_components=2, random_state=seed, init="random", perplexity=perplexity
+    )
     return reducer.fit_transform(embeddings)
 
 
-def plot_embedding_visualization(checkpoint_path, output_dir, method="tsne", max_points=5000, seed=42):
+def plot_embedding_visualization(
+    checkpoint_path, output_dir, method="tsne", max_points=5000, seed=42
+):
     plt = _load_pyplot()
     embeddings = _load_movie_embeddings(checkpoint_path)
     points = _reduce_embeddings(embeddings, method, max_points, seed)
@@ -126,7 +134,14 @@ def plot_embedding_visualization(checkpoint_path, output_dir, method="tsne", max
     return output_path
 
 
-def create_plots(ratings_path, output_dir, model_path=None, embedding_method="tsne", max_points=5000, seed=42):
+def create_plots(
+    ratings_path,
+    output_dir,
+    model_path=None,
+    embedding_method="tsne",
+    max_points=5000,
+    seed=42,
+):
     import pandas as pd
 
     output_dir = Path(output_dir)
@@ -140,19 +155,35 @@ def create_plots(ratings_path, output_dir, model_path=None, embedding_method="ts
     ]
     if model_path:
         outputs.append(plot_training_history(model_path, output_dir))
-        outputs.append(plot_embedding_visualization(model_path, output_dir, embedding_method, max_points, seed))
+        outputs.append(
+            plot_embedding_visualization(
+                model_path, output_dir, embedding_method, max_points, seed
+            )
+        )
     return [output for output in outputs if output is not None]
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Generate recommender system diagnostic plots.")
-    parser.add_argument("--ratings-path", default=DEFAULT_RATINGS_PATH, help="Path to ratings.csv.")
-    parser.add_argument("--model-path", default=DEFAULT_MODEL_PATH, help="Path to training checkpoint.")
-    parser.add_argument("--output-dir", default="plots", help="Directory where plots are written.")
+    parser = argparse.ArgumentParser(
+        description="Generate recommender system diagnostic plots."
+    )
+    parser.add_argument(
+        "--ratings-path", default=DEFAULT_RATINGS_PATH, help="Path to ratings.csv."
+    )
+    parser.add_argument(
+        "--model-path", default=DEFAULT_MODEL_PATH, help="Path to training checkpoint."
+    )
+    parser.add_argument(
+        "--output-dir", default="plots", help="Directory where plots are written."
+    )
     parser.add_argument("--embedding-method", choices=["tsne", "umap"], default="tsne")
-    parser.add_argument("--max-points", type=int, default=5000, help="Maximum embeddings to visualize.")
+    parser.add_argument(
+        "--max-points", type=int, default=5000, help="Maximum embeddings to visualize."
+    )
     parser.add_argument("--seed", type=int, default=42)
-    parser.add_argument("--skip-model-plots", action="store_true", help="Skip loss and embedding plots.")
+    parser.add_argument(
+        "--skip-model-plots", action="store_true", help="Skip loss and embedding plots."
+    )
     return parser.parse_args()
 
 
@@ -173,4 +204,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
