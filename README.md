@@ -50,6 +50,14 @@ Find similar movies:
 python -m recommender.recommend --movie-id 2959 --top-n 5
 ```
 
+Similar movie search uses cosine similarity over learned movie embeddings. You
+can filter by genre and use Annoy approximate nearest neighbors for faster
+search:
+
+```bash
+python -m recommender.recommend --movie-id 2959 --genre Drama --use-annoy
+```
+
 Compare simple baselines:
 
 ```bash

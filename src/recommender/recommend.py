@@ -15,8 +15,14 @@ DEFAULT_SAMPLE_MOVIE_IDS = [
 
 
 class MovieRecommender:
-    def __init__(self, ratings_path=DEFAULT_RATINGS_PATH, movies_path=DEFAULT_MOVIES_PATH, model_path=DEFAULT_MODEL_PATH):
+    def __init__(
+        self,
+        ratings_path=DEFAULT_RATINGS_PATH,
+        movies_path=DEFAULT_MOVIES_PATH,
+        model_path=DEFAULT_MODEL_PATH,
+    ):
         import pandas as pd
+        import torch
 
         from recommender.data import MovieLens
         from recommender.io import load_model
@@ -35,20 +41,61 @@ class MovieRecommender:
 
         load_model(self.model, model_path)
         self.movies = pd.read_csv(movies_path)
+        self.model.eval()
+        self.movie_embeddings = torch.nn.functional.normalize(self.model.movie_embedding.weight.detach(), p=2, dim=1)
+        self._annoy_index = None
 
-    def get_similar(self, target_movie_id, top_n=5):
-        from torch.nn.functional import pairwise_distance
+    def _genre_matches(self, movie_index, genre):
+        if genre is None:
+            return True
+        movie_id = self.movielens.movies[movie_index]
+        genres = self.movies[self.movies["movieId"] == movie_id]["genres"].values
+        if len(genres) == 0:
+            return False
+        return genre.lower() in genres[0].lower().split("|")
 
-        target_movie_id = self.movielens.movie_map[target_movie_id]
-        movie_embeddings = self.model.movie_embedding.weight.data
-        target_embedding = movie_embeddings[target_movie_id].reshape(1, -1)
+    def _exact_cosine_neighbors(self, target_movie_index, top_n, genre=None):
+        import torch
 
-        similarities = pairwise_distance(target_embedding.unsqueeze(0), movie_embeddings)
+        target_embedding = self.movie_embeddings[target_movie_index].reshape(1, -1)
+        similarities = torch.matmul(self.movie_embeddings, target_embedding.squeeze())
+        ranked_indices = similarities.argsort(descending=True).tolist()
+        return [
+            movie_index
+            for movie_index in ranked_indices
+            if movie_index != target_movie_index and self._genre_matches(movie_index, genre)
+        ][:top_n]
 
-        similar_movie_indices = similarities.argsort(dim=1, descending=False).squeeze()[1:top_n + 1]
+    def _annoy_neighbors(self, target_movie_index, top_n, search_k=-1, genre=None):
+        try:
+            from annoy import AnnoyIndex
+        except ImportError:
+            return None
 
-        similar_movie_indices = [id.item() for id in similar_movie_indices]
-        self.display_similar_movies(target_movie_id, similar_movie_indices)
+        embeddings = self.movie_embeddings.cpu().numpy()
+        if self._annoy_index is None:
+            self._annoy_index = AnnoyIndex(embeddings.shape[1], "angular")
+            for movie_index, embedding in enumerate(embeddings):
+                self._annoy_index.add_item(movie_index, embedding.tolist())
+            self._annoy_index.build(10)
+
+        candidate_count = min(len(embeddings), max(top_n * 20, top_n + 1))
+        candidates = self._annoy_index.get_nns_by_item(target_movie_index, candidate_count, search_k=search_k)
+        return [
+            movie_index
+            for movie_index in candidates
+            if movie_index != target_movie_index and self._genre_matches(movie_index, genre)
+        ][:top_n]
+
+    def get_similar(self, target_movie_id, top_n=5, genre=None, use_annoy=False, search_k=-1):
+        target_movie_index = self.movielens.movie_map[target_movie_id]
+        similar_movie_indices = None
+        if use_annoy:
+            similar_movie_indices = self._annoy_neighbors(target_movie_index, top_n, search_k=search_k, genre=genre)
+        if similar_movie_indices is None:
+            similar_movie_indices = self._exact_cosine_neighbors(target_movie_index, top_n, genre=genre)
+
+        self.display_similar_movies(target_movie_index, similar_movie_indices)
 
     def movie_info(self, movie_id):
         movie_id = self.movielens.movies[movie_id]
@@ -77,6 +124,9 @@ def parse_args():
     parser.add_argument("--model-path", default=DEFAULT_MODEL_PATH, help="Path to recommender_model.pth.")
     parser.add_argument("--movie-id", type=int, nargs="*", default=DEFAULT_SAMPLE_MOVIE_IDS)
     parser.add_argument("--top-n", type=int, default=5)
+    parser.add_argument("--genre", default=None, help="Only return movies containing this genre.")
+    parser.add_argument("--use-annoy", action="store_true", help="Use Annoy approximate nearest-neighbor search.")
+    parser.add_argument("--search-k", type=int, default=-1, help="Annoy search_k value; -1 uses Annoy default.")
     return parser.parse_args()
 
 
@@ -85,7 +135,13 @@ def main():
     finder = MovieRecommender(args.ratings_path, args.movies_path, args.model_path)
 
     for target_id_movie in args.movie_id:
-        finder.get_similar(target_id_movie, top_n=args.top_n)
+        finder.get_similar(
+            target_id_movie,
+            top_n=args.top_n,
+            genre=args.genre,
+            use_annoy=args.use_annoy,
+            search_k=args.search_k,
+        )
 
 
 def preview_movie_ids_main():
