@@ -9,6 +9,14 @@ sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 @unittest.skipIf(importlib.util.find_spec("pandas") is None, "pandas is not installed")
 class RecommendationTests(unittest.TestCase):
+    def test_ordered_ids_from_map_reconstructs_normalized_order(self):
+        from recommender.recommend import MovieRecommender
+
+        self.assertEqual(
+            MovieRecommender._ordered_ids_from_map({100: 1, 50: 0, 200: 2}),
+            [50, 100, 200],
+        )
+
     def test_genre_filter_matches_pipe_separated_genres(self):
         import pandas as pd
 

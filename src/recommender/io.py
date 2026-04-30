@@ -40,6 +40,10 @@ def load_model(model, filepath, device="cpu"):
     return f"Model loaded from: {filepath}"
 
 
+def load_model_artifact(filepath, device="cpu"):
+    return torch.load(filepath, map_location=device)
+
+
 def load_checkpoint(
     filepath: str, model: torch.nn.Module, optimizer=None, device="cpu"
 ):

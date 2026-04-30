@@ -28,27 +28,55 @@ class MovieRecommender:
         import torch
 
         from recommender.data import MovieLens
-        from recommender.io import load_model
+        from recommender.io import load_model_artifact
         from recommender.model import MatrixFactorization
 
         movielens_dataset = MovieLens(ratings_path)
-        num_users, num_movies = movielens_dataset.size
-        embedding_size = 200
+        checkpoint = load_model_artifact(model_path)
+        model_state_dict = (
+            checkpoint["model_state_dict"]
+            if isinstance(checkpoint, dict) and "model_state_dict" in checkpoint
+            else checkpoint
+        )
+        checkpoint_config = checkpoint.get("config", {}) if isinstance(checkpoint, dict) else {}
+        checkpoint_user_map = checkpoint.get("user_map") if isinstance(checkpoint, dict) else None
+        checkpoint_movie_map = checkpoint.get("movie_map") if isinstance(checkpoint, dict) else None
+
         self.movielens = movielens_dataset
+        if checkpoint_user_map:
+            self.movielens.user_map = checkpoint_user_map
+            self.movielens.users = self._ordered_ids_from_map(checkpoint_user_map)
+        if checkpoint_movie_map:
+            self.movielens.movie_map = checkpoint_movie_map
+            self.movielens.movies = self._ordered_ids_from_map(checkpoint_movie_map)
+        self.movielens.data["normalized_user_id"] = self.movielens.data["userId"].map(self.movielens.user_map.get)
+        self.movielens.data["normalized_movie_id"] = self.movielens.data["movieId"].map(self.movielens.movie_map.get)
+        self.movielens.size = len(self.movielens.users), len(self.movielens.movies)
+
+        num_users, num_movies = self.movielens.size
+        embedding_size = checkpoint_config.get("embedding_size", model_state_dict["movie_embedding.weight"].shape[1])
+        global_mean = model_state_dict.get("global_mean", torch.tensor(0.0)).item()
         self.model = MatrixFactorization(
             num_users,
             num_movies,
             embedding_size,
-            global_mean=movielens_dataset.global_mean,
+            global_mean=global_mean,
         )
 
-        load_model(self.model, model_path)
+        self.model.load_state_dict(model_state_dict)
         self.movies = pd.read_csv(movies_path)
         self.model.eval()
         self.movie_embeddings = torch.nn.functional.normalize(
             self.model.movie_embedding.weight.detach(), p=2, dim=1
         )
         self._annoy_index = None
+
+    @staticmethod
+    def _ordered_ids_from_map(id_map):
+        ordered_ids = [None] * len(id_map)
+        for original_id, normalized_id in id_map.items():
+            ordered_ids[int(normalized_id)] = original_id
+        return ordered_ids
 
     def _genre_matches(self, movie_index, genre):
         if genre is None:
