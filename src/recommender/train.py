@@ -1,7 +1,12 @@
 import argparse
+import json
 import random
+from datetime import datetime, timezone
+from pathlib import Path
 
 from recommender.config import DEFAULT_MODEL_PATH, DEFAULT_RATINGS_PATH
+
+DEFAULT_METRICS_PATH = Path("outputs") / "metrics.json"
 
 
 def build_user_interactions(data):
@@ -114,6 +119,29 @@ def temporal_split_indices(timestamps, val_ratio):
     return sorted_indices[:train_length], sorted_indices[train_length:]
 
 
+def append_metrics_record(metrics_path, record):
+    metrics_path = Path(metrics_path)
+    metrics_path.parent.mkdir(parents=True, exist_ok=True)
+    if metrics_path.exists():
+        with metrics_path.open("r", encoding="utf-8") as file:
+            records = json.load(file)
+    else:
+        records = []
+    records.append(record)
+    with metrics_path.open("w", encoding="utf-8") as file:
+        json.dump(records, file, indent=2, sort_keys=True)
+
+
+def make_json_safe(value):
+    if isinstance(value, dict):
+        return {key: make_json_safe(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [make_json_safe(item) for item in value]
+    if isinstance(value, Path):
+        return str(value)
+    return value
+
+
 def parse_args():
     parser = argparse.ArgumentParser(description="Train the MovieLens recommender.")
     parser.add_argument(
@@ -179,6 +207,11 @@ def parse_args():
     )
     parser.add_argument(
         "--resume-from", default=None, help="Path to a training checkpoint to resume."
+    )
+    parser.add_argument(
+        "--metrics-path",
+        default=str(DEFAULT_METRICS_PATH),
+        help="Path to JSON experiment metrics history.",
     )
     return parser.parse_args()
 
@@ -293,6 +326,8 @@ def main():
     min_val_loss = np.inf
     start_epoch = 0
     training_history = []
+    final_metrics = None
+    run_started_at = datetime.now(timezone.utc).isoformat()
 
     if args.resume_from:
         checkpoint = load_checkpoint(args.resume_from, model, optimizer, device=device)
@@ -350,6 +385,7 @@ def main():
             ),
             implicit_feedback=args.training_mode == "implicit",
         )
+        final_metrics = metrics
         print(
             "Validation Metrics: "
             + ", ".join(f"{metric}: {value:.4f}" for metric, value in metrics.items())
@@ -374,6 +410,26 @@ def main():
             movie_map=movielens.movie_map,
             config=vars(args),
             training_history=training_history,
+        )
+
+    if final_metrics is not None:
+        append_metrics_record(
+            args.metrics_path,
+            {
+                "run_started_at": run_started_at,
+                "run_finished_at": datetime.now(timezone.utc).isoformat(),
+                "metrics": make_json_safe(final_metrics),
+                "config": make_json_safe(vars(args)),
+                "comparison_keys": {
+                    "embedding_size": args.embedding_size,
+                    "training_mode": args.training_mode,
+                    "explicit_loss": args.explicit_loss,
+                    "implicit_loss": args.implicit_loss,
+                    "negatives_per_positive": args.negatives_per_positive,
+                    "learning_rate": args.learning_rate,
+                },
+                "epochs_completed": len(training_history),
+            },
         )
 
     print("Training finished.")

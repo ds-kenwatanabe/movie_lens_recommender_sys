@@ -75,6 +75,28 @@ class RecommendationTests(unittest.TestCase):
 
         self.assertEqual([movie_index for movie_index, _ in recommendations], [2, 0])
 
+    def test_unknown_user_gets_cold_start_recommendations(self):
+        import pandas as pd
+
+        from recommender.recommend import MovieRecommender
+
+        recommender = object.__new__(MovieRecommender)
+        recommender.movielens = type(
+            "MovieLensStub", (), {"user_map": {}, "movies": [10, 20]}
+        )()
+        recommender.movies = pd.DataFrame(
+            {
+                "movieId": [10, 20],
+                "title": ["A", "B"],
+                "genres": ["Action", "Drama"],
+            }
+        )
+        recommender.movie_popularity_scores = {0: 1.0, 1: 3.0}
+
+        recommendations = recommender.recommend_for_user(999, top_k=1)
+
+        self.assertEqual(recommendations, [(1, 3.0)])
+
 
 if __name__ == "__main__":
     unittest.main()

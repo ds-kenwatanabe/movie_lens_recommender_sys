@@ -38,9 +38,15 @@ class MovieRecommender:
             if isinstance(checkpoint, dict) and "model_state_dict" in checkpoint
             else checkpoint
         )
-        checkpoint_config = checkpoint.get("config", {}) if isinstance(checkpoint, dict) else {}
-        checkpoint_user_map = checkpoint.get("user_map") if isinstance(checkpoint, dict) else None
-        checkpoint_movie_map = checkpoint.get("movie_map") if isinstance(checkpoint, dict) else None
+        checkpoint_config = (
+            checkpoint.get("config", {}) if isinstance(checkpoint, dict) else {}
+        )
+        checkpoint_user_map = (
+            checkpoint.get("user_map") if isinstance(checkpoint, dict) else None
+        )
+        checkpoint_movie_map = (
+            checkpoint.get("movie_map") if isinstance(checkpoint, dict) else None
+        )
 
         self.movielens = movielens_dataset
         if checkpoint_user_map:
@@ -49,12 +55,18 @@ class MovieRecommender:
         if checkpoint_movie_map:
             self.movielens.movie_map = checkpoint_movie_map
             self.movielens.movies = self._ordered_ids_from_map(checkpoint_movie_map)
-        self.movielens.data["normalized_user_id"] = self.movielens.data["userId"].map(self.movielens.user_map.get)
-        self.movielens.data["normalized_movie_id"] = self.movielens.data["movieId"].map(self.movielens.movie_map.get)
+        self.movielens.data["normalized_user_id"] = self.movielens.data["userId"].map(
+            self.movielens.user_map.get
+        )
+        self.movielens.data["normalized_movie_id"] = self.movielens.data["movieId"].map(
+            self.movielens.movie_map.get
+        )
         self.movielens.size = len(self.movielens.users), len(self.movielens.movies)
 
         num_users, num_movies = self.movielens.size
-        embedding_size = checkpoint_config.get("embedding_size", model_state_dict["movie_embedding.weight"].shape[1])
+        embedding_size = checkpoint_config.get(
+            "embedding_size", model_state_dict["movie_embedding.weight"].shape[1]
+        )
         global_mean = model_state_dict.get("global_mean", torch.tensor(0.0)).item()
         self.model = MatrixFactorization(
             num_users,
@@ -69,6 +81,7 @@ class MovieRecommender:
         self.movie_embeddings = torch.nn.functional.normalize(
             self.model.movie_embedding.weight.detach(), p=2, dim=1
         )
+        self.movie_popularity_scores = self._build_movie_popularity_scores()
         self._annoy_index = None
 
     @staticmethod
@@ -77,6 +90,18 @@ class MovieRecommender:
         for original_id, normalized_id in id_map.items():
             ordered_ids[int(normalized_id)] = original_id
         return ordered_ids
+
+    def _build_movie_popularity_scores(self):
+        stats = (
+            self.movielens.data.groupby("normalized_movie_id")["rating"]
+            .agg(["count", "mean"])
+            .to_dict("index")
+        )
+        max_count = max((item["count"] for item in stats.values()), default=1)
+        return {
+            int(movie_index): (values["count"] / max_count) * float(values["mean"])
+            for movie_index, values in stats.items()
+        }
 
     def _genre_matches(self, movie_index, genre):
         if genre is None:
@@ -144,7 +169,9 @@ class MovieRecommender:
         import torch
 
         if user_id not in self.movielens.user_map:
-            raise ValueError(f"Unknown user id: {user_id}")
+            recommendations = self.recommend_cold_start(top_k=top_k, genre=genre)
+            self.display_user_recommendations(user_id, recommendations, cold_start=True)
+            return recommendations
 
         normalized_user_id = self.movielens.user_map[user_id]
         interacted_movies = set(
@@ -176,6 +203,22 @@ class MovieRecommender:
         self.display_user_recommendations(user_id, recommendations)
         return recommendations
 
+    def recommend_cold_start(self, top_k=10, genre=None):
+        candidate_movie_indices = [
+            movie_index
+            for movie_index in range(len(self.movielens.movies))
+            if self._genre_matches(movie_index, genre)
+        ]
+        ranked_movies = sorted(
+            candidate_movie_indices,
+            key=lambda movie_index: self.movie_popularity_scores.get(movie_index, 0.0),
+            reverse=True,
+        )
+        return [
+            (movie_index, self.movie_popularity_scores.get(movie_index, 0.0))
+            for movie_index in ranked_movies[:top_k]
+        ]
+
     def movie_info(self, movie_id):
         movie_id = self.movielens.movies[movie_id]
         return {
@@ -196,8 +239,9 @@ class MovieRecommender:
             title = self.movie_info(id)
             print(f'- [{title["Movie ID"][0]}] {title["Title"]} [{title["Genre"]}]')
 
-    def display_user_recommendations(self, user_id, recommendations):
-        print(f"Top {len(recommendations)} recommendations for user {user_id}")
+    def display_user_recommendations(self, user_id, recommendations, cold_start=False):
+        label = "cold-start recommendations" if cold_start else "recommendations"
+        print(f"Top {len(recommendations)} {label} for user {user_id}")
 
         for movie_index, score in recommendations:
             title = self.movie_info(movie_index)

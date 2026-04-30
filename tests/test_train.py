@@ -1,14 +1,18 @@
 from pathlib import Path
 import importlib.util
+import json
 import sys
+import tempfile
 import unittest
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 from recommender.train import (  # noqa: E402
+    append_metrics_record,
     build_bpr_samples,
     build_implicit_feedback_samples,
+    make_json_safe,
     temporal_split_indices,
 )
 
@@ -25,6 +29,23 @@ class TemporalSplitTests(unittest.TestCase):
     def test_temporal_split_rejects_invalid_ratio(self):
         with self.assertRaises(ValueError):
             temporal_split_indices([10, 20], val_ratio=0.0)
+
+    def test_metrics_records_append_to_json_history(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            metrics_path = Path(temp_dir) / "metrics.json"
+            append_metrics_record(metrics_path, {"run": 1})
+            append_metrics_record(metrics_path, {"run": 2})
+
+            with metrics_path.open("r", encoding="utf-8") as file:
+                records = json.load(file)
+
+        self.assertEqual(records, [{"run": 1}, {"run": 2}])
+
+    def test_make_json_safe_converts_paths(self):
+        self.assertEqual(
+            make_json_safe({"path": Path("outputs/metrics.json")}),
+            {"path": "outputs/metrics.json"},
+        )
 
 
 @unittest.skipIf(importlib.util.find_spec("pandas") is None, "pandas is not installed")
