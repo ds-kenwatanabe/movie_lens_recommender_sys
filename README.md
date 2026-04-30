@@ -70,6 +70,12 @@ Compare simple baselines:
 python -m recommender.baselines
 ```
 
+Generate diagnostic plots:
+
+```bash
+python -m recommender.plots --output-dir plots
+```
+
 The legacy wrappers still work:
 
 ```bash
@@ -88,6 +94,8 @@ settings.
 Training saves resumable checkpoints at `--model-path`. A checkpoint contains
 model weights, optimizer state, epoch, validation metrics, user/movie ID
 mappings, and the training config. Resume with `--resume-from path/to/checkpoint`.
+Checkpoints also include training history for plotting training loss against
+validation MAE.
 
 ## Tests
 
@@ -106,3 +114,7 @@ full MovieLens 25M dataset can take significant time depending on hardware.
 
 Baseline comparison includes global mean, user mean, movie mean, popularity,
 item-item cosine similarity, and truncated SVD.
+
+Diagnostic plotting includes training loss vs validation MAE, rating
+distribution, ratings per user, ratings per movie, and movie embedding
+visualization with t-SNE or UMAP.

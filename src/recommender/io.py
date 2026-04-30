@@ -15,6 +15,7 @@ def save_checkpoint(
     user_map: dict,
     movie_map: dict,
     config: dict,
+    training_history=None,
 ):
     checkpoint = {
         "model_state_dict": model.state_dict(),
@@ -24,6 +25,7 @@ def save_checkpoint(
         "user_map": user_map,
         "movie_map": movie_map,
         "config": config,
+        "training_history": training_history or [],
     }
     torch.save(checkpoint, filepath)
     return f"Checkpoint saved to: {filepath}"

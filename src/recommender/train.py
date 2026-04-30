@@ -156,10 +156,12 @@ def main():
     optimizer = optim.Adam(model.parameters(), lr=args.learning_rate, weight_decay=args.weight_decay)
     min_val_loss = np.inf
     start_epoch = 0
+    training_history = []
 
     if args.resume_from:
         checkpoint = load_checkpoint(args.resume_from, model, optimizer, device=device)
         start_epoch = int(checkpoint["epoch"]) + 1
+        training_history = checkpoint.get("training_history", [])
         validation_metrics = checkpoint.get("validation_metrics")
         if validation_metrics and "mae" in validation_metrics:
             min_val_loss = validation_metrics["mae"]
@@ -204,6 +206,11 @@ def main():
 
         if metrics["mae"] < min_val_loss:
             min_val_loss = metrics["mae"]
+        training_history.append({
+            "epoch": epoch + 1,
+            "train_loss": running_loss,
+            "validation_metrics": metrics,
+        })
         save_checkpoint(
             args.model_path,
             model=model,
@@ -213,6 +220,7 @@ def main():
             user_map=movielens.user_map,
             movie_map=movielens.movie_map,
             config=vars(args),
+            training_history=training_history,
         )
 
     print("Training finished.")

@@ -17,6 +17,7 @@ class ImportTests(unittest.TestCase):
             "recommender.data",
             "recommender.evaluate",
             "recommender.model",
+            "recommender.plots",
             "recommender.recommend",
             "recommender.train",
         ]
