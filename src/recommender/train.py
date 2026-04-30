@@ -83,6 +83,7 @@ def parse_args():
     parser.add_argument("--eval-k", type=int, default=10, help="K for ranking metrics such as Precision@K.")
     parser.add_argument("--relevance-threshold", type=float, default=4.0, help="Minimum rating treated as relevant.")
     parser.add_argument("--negatives-per-positive", type=int, default=4, help="Negative samples per positive rating.")
+    parser.add_argument("--resume-from", default=None, help="Path to a training checkpoint to resume.")
     return parser.parse_args()
 
 
@@ -99,7 +100,7 @@ def main():
 
     from recommender.data import MovieLens
     from recommender.evaluate import evaluate_model
-    from recommender.io import save_model
+    from recommender.io import load_checkpoint, save_checkpoint
     from recommender.model import MatrixFactorization
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -154,8 +155,17 @@ def main():
     loss_fn = torch.nn.BCEWithLogitsLoss().to(device)
     optimizer = optim.Adam(model.parameters(), lr=args.learning_rate, weight_decay=args.weight_decay)
     min_val_loss = np.inf
+    start_epoch = 0
 
-    for epoch in range(args.epochs):
+    if args.resume_from:
+        checkpoint = load_checkpoint(args.resume_from, model, optimizer, device=device)
+        start_epoch = int(checkpoint["epoch"]) + 1
+        validation_metrics = checkpoint.get("validation_metrics")
+        if validation_metrics and "mae" in validation_metrics:
+            min_val_loss = validation_metrics["mae"]
+        print(f"Resuming from epoch {start_epoch + 1}")
+
+    for epoch in range(start_epoch, args.epochs):
         print(f"Epoch {epoch + 1}\n")
         running_loss = 0.0
 
@@ -193,8 +203,17 @@ def main():
         )
 
         if metrics["mae"] < min_val_loss:
-            save_model(model, args.model_path)
             min_val_loss = metrics["mae"]
+        save_checkpoint(
+            args.model_path,
+            model=model,
+            optimizer=optimizer,
+            epoch=epoch,
+            validation_metrics=metrics,
+            user_map=movielens.user_map,
+            movie_map=movielens.movie_map,
+            config=vars(args),
+        )
 
     print("Training finished.")
 

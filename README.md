@@ -71,6 +71,10 @@ as positives and sampled non-interacted movies are treated as negatives. CLI
 arguments can override the dataset, movie metadata, model paths, and evaluation
 settings.
 
+Training saves resumable checkpoints at `--model-path`. A checkpoint contains
+model weights, optimizer state, epoch, validation metrics, user/movie ID
+mappings, and the training config. Resume with `--resume-from path/to/checkpoint`.
+
 ## Tests
 
 ```bash
