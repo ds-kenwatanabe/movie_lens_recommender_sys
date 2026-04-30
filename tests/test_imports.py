@@ -12,6 +12,7 @@ class ImportTests(unittest.TestCase):
     def test_package_modules_are_discoverable(self):
         modules = [
             "recommender",
+            "recommender.baselines",
             "recommender.config",
             "recommender.data",
             "recommender.evaluate",

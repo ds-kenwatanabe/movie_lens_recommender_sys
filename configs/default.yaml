@@ -13,3 +13,4 @@ split_strategy: temporal
 eval_k: 10
 relevance_threshold: 4.0
 negatives_per_positive: 4
+svd_factors: 50

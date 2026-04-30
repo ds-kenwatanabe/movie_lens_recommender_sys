@@ -50,6 +50,12 @@ Find similar movies:
 python -m recommender.recommend --movie-id 2959 --top-n 5
 ```
 
+Compare simple baselines:
+
+```bash
+python -m recommender.baselines
+```
+
 The legacy wrappers still work:
 
 ```bash
@@ -79,3 +85,6 @@ positive interactions and sampled negatives, optimized with Adam and weight
 decay regularization. Validation reports MAE, RMSE, Precision@K, Recall@K,
 NDCG@K, HitRate@K, and catalog coverage. Training and ranking evaluation on the
 full MovieLens 25M dataset can take significant time depending on hardware.
+
+Baseline comparison includes global mean, user mean, movie mean, popularity,
+item-item cosine similarity, and truncated SVD.

@@ -5,6 +5,7 @@ __all__ = [
     "MovieLens",
     "MovieRecommender",
     "SimilarMovies",
+    "compare_baselines",
 ]
 
 
@@ -21,4 +22,8 @@ def __getattr__(name):
         from recommender.recommend import MovieRecommender, SimilarMovies
 
         return {"MovieRecommender": MovieRecommender, "SimilarMovies": SimilarMovies}[name]
+    if name == "compare_baselines":
+        from recommender.baselines import compare_baselines
+
+        return compare_baselines
     raise AttributeError(f"module 'recommender' has no attribute {name!r}")
