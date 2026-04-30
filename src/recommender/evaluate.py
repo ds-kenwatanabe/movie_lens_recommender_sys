@@ -15,21 +15,23 @@ def _ndcg_at_k(recommended_movies, relevant_movies, k):
     return dcg / idcg
 
 
-def _rank_movies_for_user(model, user_id, num_movies, k, device):
-    movie_ids = torch.arange(num_movies, device=device)
-    user_ids = torch.full((num_movies,), user_id, dtype=torch.long, device=device)
+def _rank_movies_for_user(model, user_id, candidate_movie_ids, k, device):
+    movie_ids = torch.tensor(candidate_movie_ids, dtype=torch.long, device=device)
+    user_ids = torch.full((len(candidate_movie_ids),), user_id, dtype=torch.long, device=device)
     scores = model(user_ids, movie_ids)
-    top_k = min(k, num_movies)
-    return torch.topk(scores, k=top_k).indices.cpu().tolist()
+    top_k = min(k, len(candidate_movie_ids))
+    top_positions = torch.topk(scores, k=top_k).indices.cpu().tolist()
+    return [candidate_movie_ids[position] for position in top_positions]
 
 
-def evaluate_model(model, dataloader, device, k=10, relevance_threshold=4.0):
+def evaluate_model(model, dataloader, device, k=10, relevance_threshold=4.0, implicit_feedback=False):
     if k < 1:
         raise ValueError("k must be at least 1")
 
     model.eval()
     predictions = []
     targets = []
+    candidates_by_user = {}
     relevant_by_user = {}
 
     with torch.no_grad():
@@ -39,7 +41,10 @@ def evaluate_model(model, dataloader, device, k=10, relevance_threshold=4.0):
             ratings = ratings.view(-1).to(device)
 
             val_preds = model(user_id, movies_id)
-            predictions.append(val_preds.detach().cpu())
+            if implicit_feedback:
+                predictions.append(torch.sigmoid(val_preds).detach().cpu())
+            else:
+                predictions.append(val_preds.detach().cpu())
             targets.append(ratings.detach().cpu())
 
             for batch_user_id, batch_movie_id, batch_rating in zip(
@@ -47,6 +52,7 @@ def evaluate_model(model, dataloader, device, k=10, relevance_threshold=4.0):
                 movies_id.detach().cpu().tolist(),
                 ratings.detach().cpu().tolist(),
             ):
+                candidates_by_user.setdefault(batch_user_id, set()).add(batch_movie_id)
                 if batch_rating >= relevance_threshold:
                     relevant_by_user.setdefault(batch_user_id, set()).add(batch_movie_id)
 
@@ -65,11 +71,12 @@ def evaluate_model(model, dataloader, device, k=10, relevance_threshold=4.0):
         hit_scores = []
 
         for user_id, relevant_movies in relevant_by_user.items():
-            top_movies = _rank_movies_for_user(model, user_id, num_movies, k, device)
+            candidate_movie_ids = sorted(candidates_by_user[user_id])
+            top_movies = _rank_movies_for_user(model, user_id, candidate_movie_ids, k, device)
             recommended_movies.update(top_movies)
             hits = len(set(top_movies) & relevant_movies)
 
-            precision_scores.append(hits / min(k, num_movies))
+            precision_scores.append(hits / min(k, len(candidate_movie_ids)))
             recall_scores.append(hits / len(relevant_movies))
             ndcg_scores.append(_ndcg_at_k(top_movies, relevant_movies, k))
             hit_scores.append(1.0 if hits > 0 else 0.0)
