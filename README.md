@@ -75,7 +75,7 @@ PYTHONPATH=src python -m unittest discover -s tests
 
 The model scores user/movie pairs with user bias, movie bias, and the dot
 product of user/movie embeddings. Training uses binary cross entropy over
-positive interactions and sampled negatives. Validation reports MAE, RMSE,
-Precision@K, Recall@K, NDCG@K, HitRate@K, and catalog coverage. Training and
-ranking evaluation on the full MovieLens 25M dataset can take significant time
-depending on hardware.
+positive interactions and sampled negatives, optimized with Adam and weight
+decay regularization. Validation reports MAE, RMSE, Precision@K, Recall@K,
+NDCG@K, HitRate@K, and catalog coverage. Training and ranking evaluation on the
+full MovieLens 25M dataset can take significant time depending on hardware.

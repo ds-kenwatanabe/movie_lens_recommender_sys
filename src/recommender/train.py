@@ -76,6 +76,7 @@ def parse_args():
     parser.add_argument("--batch-size", type=int, default=4096)
     parser.add_argument("--embedding-size", type=int, default=200)
     parser.add_argument("--learning-rate", type=float, default=1e-4)
+    parser.add_argument("--weight-decay", type=float, default=1e-5, help="Adam weight decay for L2 regularization.")
     parser.add_argument("--epochs", type=int, default=20, help="Might take a day or more depending on hardware.")
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--val-ratio", type=float, default=0.2)
@@ -151,7 +152,7 @@ def main():
     ).to(device)
 
     loss_fn = torch.nn.BCEWithLogitsLoss().to(device)
-    optimizer = optim.Adam(model.parameters(), lr=args.learning_rate)
+    optimizer = optim.Adam(model.parameters(), lr=args.learning_rate, weight_decay=args.weight_decay)
     min_val_loss = np.inf
 
     for epoch in range(args.epochs):
