@@ -97,6 +97,39 @@ class MovieRecommender:
 
         self.display_similar_movies(target_movie_index, similar_movie_indices)
 
+    def recommend_for_user(self, user_id, top_k=10, genre=None):
+        import torch
+
+        if user_id not in self.movielens.user_map:
+            raise ValueError(f"Unknown user id: {user_id}")
+
+        normalized_user_id = self.movielens.user_map[user_id]
+        interacted_movies = set(
+            self.movielens.data[self.movielens.data["normalized_user_id"] == normalized_user_id][
+                "normalized_movie_id"
+            ].tolist()
+        )
+        candidate_movie_indices = [
+            movie_index
+            for movie_index in range(len(self.movielens.movies))
+            if movie_index not in interacted_movies and self._genre_matches(movie_index, genre)
+        ]
+        if not candidate_movie_indices:
+            return []
+
+        movie_ids = torch.LongTensor(candidate_movie_indices)
+        user_ids = torch.full((len(candidate_movie_indices),), normalized_user_id, dtype=torch.long)
+        with torch.no_grad():
+            scores = self.model(user_ids, movie_ids)
+
+        ranked_positions = scores.argsort(descending=True).tolist()
+        recommendations = [
+            (candidate_movie_indices[position], scores[position].item())
+            for position in ranked_positions[:top_k]
+        ]
+        self.display_user_recommendations(user_id, recommendations)
+        return recommendations
+
     def movie_info(self, movie_id):
         movie_id = self.movielens.movies[movie_id]
         return {
@@ -113,17 +146,26 @@ class MovieRecommender:
             title = self.movie_info(id)
             print(f'- [{title["Movie ID"][0]}] {title["Title"]} [{title["Genre"]}]')
 
+    def display_user_recommendations(self, user_id, recommendations):
+        print(f"Top {len(recommendations)} recommendations for user {user_id}")
+
+        for movie_index, score in recommendations:
+            title = self.movie_info(movie_index)
+            print(f'- [{title["Movie ID"][0]}] {title["Title"]} [{title["Genre"]}] score={score:.4f}')
+
 
 SimilarMovies = MovieRecommender
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Find movies with similar embeddings.")
+    parser = argparse.ArgumentParser(description="Recommend movies or find similar movies.")
     parser.add_argument("--ratings-path", default=DEFAULT_RATINGS_PATH, help="Path to ratings.csv.")
     parser.add_argument("--movies-path", default=DEFAULT_MOVIES_PATH, help="Path to movies.csv.")
     parser.add_argument("--model-path", default=DEFAULT_MODEL_PATH, help="Path to recommender_model.pth.")
-    parser.add_argument("--movie-id", type=int, nargs="*", default=DEFAULT_SAMPLE_MOVIE_IDS)
+    parser.add_argument("--user-id", type=int, default=None, help="User ID to generate top-K recommendations for.")
+    parser.add_argument("--movie-id", type=int, nargs="*", default=None)
     parser.add_argument("--top-n", type=int, default=5)
+    parser.add_argument("--top-k", type=int, default=10)
     parser.add_argument("--genre", default=None, help="Only return movies containing this genre.")
     parser.add_argument("--use-annoy", action="store_true", help="Use Annoy approximate nearest-neighbor search.")
     parser.add_argument("--search-k", type=int, default=-1, help="Annoy search_k value; -1 uses Annoy default.")
@@ -134,7 +176,11 @@ def main():
     args = parse_args()
     finder = MovieRecommender(args.ratings_path, args.movies_path, args.model_path)
 
-    for target_id_movie in args.movie_id:
+    if args.user_id is not None:
+        finder.recommend_for_user(args.user_id, top_k=args.top_k, genre=args.genre)
+        return
+
+    for target_id_movie in args.movie_id or DEFAULT_SAMPLE_MOVIE_IDS:
         finder.get_similar(
             target_id_movie,
             top_n=args.top_n,

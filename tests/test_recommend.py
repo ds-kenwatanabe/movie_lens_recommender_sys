@@ -26,7 +26,41 @@ class RecommendationTests(unittest.TestCase):
         self.assertTrue(recommender._genre_matches(0, "Drama"))
         self.assertFalse(recommender._genre_matches(1, "Drama"))
 
+    @unittest.skipIf(importlib.util.find_spec("torch") is None, "torch is not installed")
+    def test_recommend_for_user_excludes_interacted_movies(self):
+        import pandas as pd
+        import torch
+
+        from recommender.recommend import MovieRecommender
+
+        class ModelStub:
+            def __call__(self, user_ids, movie_ids):
+                return movie_ids.float()
+
+        recommender = object.__new__(MovieRecommender)
+        recommender.model = ModelStub()
+        recommender.movielens = type(
+            "MovieLensStub",
+            (),
+            {
+                "user_map": {123: 0},
+                "movies": [10, 20, 30],
+                "data": pd.DataFrame({
+                    "normalized_user_id": [0],
+                    "normalized_movie_id": [1],
+                }),
+            },
+        )()
+        recommender.movies = pd.DataFrame({
+            "movieId": [10, 20, 30],
+            "title": ["A", "B", "C"],
+            "genres": ["Action", "Action", "Action"],
+        })
+
+        recommendations = recommender.recommend_for_user(123, top_k=3)
+
+        self.assertEqual([movie_index for movie_index, _ in recommendations], [2, 0])
+
 
 if __name__ == "__main__":
     unittest.main()
-

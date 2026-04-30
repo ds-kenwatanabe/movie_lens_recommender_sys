@@ -50,6 +50,12 @@ Find similar movies:
 python -m recommender.recommend --movie-id 2959 --top-n 5
 ```
 
+Recommend movies for a user:
+
+```bash
+python -m recommender.recommend --user-id 123 --top-k 10
+```
+
 Similar movie search uses cosine similarity over learned movie embeddings. You
 can filter by genre and use Annoy approximate nearest neighbors for faster
 search:
