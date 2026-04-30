@@ -18,5 +18,10 @@ dependencies = [
     "umap-learn==0.5.5",
 ]
 
+[project.scripts]
+recommender-train = "recommender.train:main"
+recommender-recommend = "recommender.recommend:main"
+recommender-baselines = "recommender.baselines:main"
+
 [tool.setuptools.packages.find]
 where = ["src"]
