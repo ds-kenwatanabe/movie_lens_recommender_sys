@@ -1,4 +1,5 @@
 import importlib.util
+import inspect
 from pathlib import Path
 import sys
 import unittest
@@ -7,10 +8,25 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 
+class BaselineImplementationTests(unittest.TestCase):
+    def test_svd_baseline_uses_sparse_truncated_svd(self):
+        from recommender.baselines import SVDBaseline
+
+        source = inspect.getsource(SVDBaseline.fit)
+
+        self.assertIn("csr_matrix", source)
+        self.assertIn("TruncatedSVD", source)
+        self.assertNotIn("np.full", source)
+        self.assertNotIn("np.linalg.svd", source)
+        self.assertNotIn("self.predictions", inspect.getsource(SVDBaseline))
+
+
 @unittest.skipIf(
     importlib.util.find_spec("pandas") is None
-    or importlib.util.find_spec("numpy") is None,
-    "pandas and numpy are required for baseline tests",
+    or importlib.util.find_spec("numpy") is None
+    or importlib.util.find_spec("scipy") is None
+    or importlib.util.find_spec("sklearn") is None,
+    "pandas, numpy, scipy, and scikit-learn are required for baseline tests",
 )
 class BaselineTests(unittest.TestCase):
     def test_compare_baselines_returns_requested_models(self):

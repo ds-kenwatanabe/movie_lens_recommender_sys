@@ -95,30 +95,44 @@ class ItemItemCosineBaseline:
 class SVDBaseline:
     supports_rating_metrics = True
 
-    def __init__(self, factors=50):
+    def __init__(self, factors=50, random_state=42):
         self.factors = factors
+        self.random_state = random_state
 
     def fit(self, data, num_users, num_movies):
-        import numpy as np
+        from scipy.sparse import csr_matrix
+        from sklearn.decomposition import TruncatedSVD
 
         self.global_mean = float(data["rating"].mean())
-        matrix = np.full((num_users, num_movies), self.global_mean, dtype=float)
-        for row in data.itertuples(index=False):
-            matrix[int(row.normalized_user_id), int(row.normalized_movie_id)] = float(
-                row.rating
-            )
+        max_factors = min(num_users, num_movies) - 1
+        self.fitted = max_factors >= 1
+        if not self.fitted:
+            return self
 
-        centered = matrix - self.global_mean
-        u, singular_values, vt = np.linalg.svd(centered, full_matrices=False)
-        factors = min(self.factors, len(singular_values))
-        self.predictions = (
-            self.global_mean
-            + (u[:, :factors] * singular_values[:factors]) @ vt[:factors, :]
+        factors = min(self.factors, max_factors)
+        residuals = data["rating"].astype(float) - self.global_mean
+        residual_matrix = csr_matrix(
+            (
+                residuals,
+                (
+                    data["normalized_user_id"].astype(int),
+                    data["normalized_movie_id"].astype(int),
+                ),
+            ),
+            shape=(num_users, num_movies),
         )
+        svd = TruncatedSVD(n_components=factors, random_state=self.random_state)
+        self.user_factors = svd.fit_transform(residual_matrix)
+        self.movie_factors = svd.components_
         return self
 
     def score(self, user_id, movie_id):
-        return float(self.predictions[user_id, movie_id])
+        if not self.fitted:
+            return self.global_mean
+        return float(
+            self.global_mean
+            + self.user_factors[user_id] @ self.movie_factors[:, movie_id]
+        )
 
 
 def _ndcg_at_k(recommended_movies, relevant_movies, k):
@@ -229,7 +243,7 @@ def compare_baselines(
         "movie_mean": MovieMeanBaseline(),
         "popularity": PopularityBaseline(),
         "item_item_cosine": ItemItemCosineBaseline(),
-        "svd": SVDBaseline(factors=svd_factors),
+        "svd": SVDBaseline(factors=svd_factors, random_state=seed),
     }
 
     results = {}
