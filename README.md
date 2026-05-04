@@ -86,10 +86,10 @@ python get_movie_ids.py --rows 10
 
 Default paths and training parameters are documented in `configs/default.yaml`.
 Training uses a temporal validation split: earlier ratings train the model and
-later ratings validate it. For top-N recommendation, high ratings are treated
-as positives and sampled non-interacted movies are treated as negatives. CLI
-arguments can override the dataset, movie metadata, model paths, and evaluation
-settings.
+later ratings validate it. For sampled ranking evaluation, high ratings are
+treated as positives and sampled non-interacted movies are treated as negatives.
+CLI arguments can override the dataset, movie metadata, model paths, and
+evaluation settings.
 
 Training supports two modes:
 
@@ -120,9 +120,10 @@ PYTHONPATH=src python -m unittest discover -s tests
 The model scores user/movie pairs with user bias, movie bias, and the dot
 product of user/movie embeddings. Explicit mode predicts ratings with MSE or
 MAE. Implicit mode predicts relevance with BCE over sampled negatives or BPR
-pairwise ranking loss. Validation reports MAE, RMSE, Precision@K, Recall@K,
-NDCG@K, HitRate@K, and catalog coverage. Training and ranking evaluation on the
-full MovieLens 25M dataset can take significant time depending on hardware.
+pairwise ranking loss. Validation reports MAE and RMSE for rating prediction,
+plus Precision@K, Recall@K, NDCG@K, HitRate@K, and catalog coverage from sampled
+ranking evaluation. Training and evaluation on the full MovieLens 25M dataset
+can take significant time depending on hardware.
 
 Baseline comparison includes global mean, user mean, movie mean, popularity,
 item-item cosine similarity, and truncated SVD.
