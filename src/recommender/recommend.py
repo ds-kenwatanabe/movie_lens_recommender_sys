@@ -17,6 +17,19 @@ DEFAULT_SAMPLE_MOVIE_IDS = [
 ]
 
 
+def infer_embedding_size(checkpoint_config, model_state_dict):
+    configured_size = checkpoint_config.get("embedding_size")
+    if configured_size is not None:
+        return int(configured_size)
+
+    movie_embedding = model_state_dict.get("movie_embedding.weight")
+    if movie_embedding is None:
+        raise ValueError(
+            "Checkpoint is missing config['embedding_size'] and movie_embedding.weight"
+        )
+    return int(movie_embedding.shape[1])
+
+
 class MovieRecommender:
     def __init__(
         self,
@@ -64,8 +77,9 @@ class MovieRecommender:
         self.movielens.size = len(self.movielens.users), len(self.movielens.movies)
 
         num_users, num_movies = self.movielens.size
-        embedding_size = checkpoint_config.get(
-            "embedding_size", model_state_dict["movie_embedding.weight"].shape[1]
+        embedding_size = infer_embedding_size(
+            checkpoint_config,
+            model_state_dict,
         )
         global_mean = model_state_dict.get("global_mean", torch.tensor(0.0)).item()
         self.model = MatrixFactorization(

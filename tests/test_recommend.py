@@ -7,6 +7,26 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 
+class RecommendationMetadataTests(unittest.TestCase):
+    def test_infer_embedding_size_prefers_checkpoint_config(self):
+        from recommender.recommend import infer_embedding_size
+
+        state_dict = {
+            "movie_embedding.weight": type("TensorStub", (), {"shape": (3, 12)})()
+        }
+
+        self.assertEqual(infer_embedding_size({"embedding_size": 7}, state_dict), 7)
+
+    def test_infer_embedding_size_falls_back_to_checkpoint_weights(self):
+        from recommender.recommend import infer_embedding_size
+
+        state_dict = {
+            "movie_embedding.weight": type("TensorStub", (), {"shape": (3, 12)})()
+        }
+
+        self.assertEqual(infer_embedding_size({}, state_dict), 12)
+
+
 @unittest.skipIf(importlib.util.find_spec("pandas") is None, "pandas is not installed")
 class RecommendationTests(unittest.TestCase):
     def test_ordered_ids_from_map_reconstructs_normalized_order(self):
