@@ -25,6 +25,7 @@ dependencies = [
 recommender-train = "recommender.train:main"
 recommender-recommend = "recommender.recommend:main"
 recommender-baselines = "recommender.baselines:main"
+recommender-plots = "recommender.plots:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
