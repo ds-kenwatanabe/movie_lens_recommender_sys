@@ -77,11 +77,13 @@ class MovieRecommender:
 
         self.model.load_state_dict(model_state_dict)
         self.movies = pd.read_csv(movies_path)
+        self.catalog_movie_ids = self.movies["movieId"].tolist()
         self.model.eval()
         self.movie_embeddings = torch.nn.functional.normalize(
             self.model.movie_embedding.weight.detach(), p=2, dim=1
         )
         self.movie_popularity_scores = self._build_movie_popularity_scores()
+        self.catalog_popularity_scores = self._build_catalog_popularity_scores()
         self._annoy_index = None
 
     @staticmethod
@@ -103,14 +105,35 @@ class MovieRecommender:
             for movie_index, values in stats.items()
         }
 
+    def _build_catalog_popularity_scores(self):
+        stats = (
+            self.movielens.data.groupby("movieId")["rating"]
+            .agg(["count", "mean"])
+            .to_dict("index")
+        )
+        max_count = max((item["count"] for item in stats.values()), default=1)
+        return {
+            int(movie_id): (values["count"] / max_count) * float(values["mean"])
+            for movie_id, values in stats.items()
+        }
+
     def _genre_matches(self, movie_index, genre):
+        movie_id = self.movielens.movies[movie_index]
+        return self._genre_matches_movie_id(movie_id, genre)
+
+    def _genre_matches_movie_id(self, movie_id, genre):
         if genre is None:
             return True
-        movie_id = self.movielens.movies[movie_index]
         genres = self.movies[self.movies["movieId"] == movie_id]["genres"].values
         if len(genres) == 0:
             return False
         return genre.lower() in genres[0].lower().split("|")
+
+    def _primary_genre_for_movie_id(self, movie_id):
+        genres = self.movies[self.movies["movieId"] == movie_id]["genres"].values
+        if len(genres) == 0 or genres[0] == "(no genres listed)":
+            return None
+        return genres[0].split("|")[0]
 
     def _exact_cosine_neighbors(self, target_movie_index, top_n, genre=None):
         import torch
@@ -152,6 +175,15 @@ class MovieRecommender:
     def get_similar(
         self, target_movie_id, top_n=5, genre=None, use_annoy=False, search_k=-1
     ):
+        if target_movie_id not in self.movielens.movie_map:
+            similar_movies = self.recommend_cold_start(
+                top_k=top_n + 1,
+                genre=genre or self._primary_genre_for_movie_id(target_movie_id),
+                exclude_movie_ids={target_movie_id},
+            )[:top_n]
+            self.display_similar_catalog_movies(target_movie_id, similar_movies)
+            return similar_movies
+
         target_movie_index = self.movielens.movie_map[target_movie_id]
         similar_movie_indices = None
         if use_annoy:
@@ -197,36 +229,75 @@ class MovieRecommender:
 
         ranked_positions = scores.argsort(descending=True).tolist()
         recommendations = [
-            (candidate_movie_indices[position], scores[position].item())
+            (
+                self.movielens.movies[candidate_movie_indices[position]],
+                scores[position].item(),
+            )
             for position in ranked_positions[:top_k]
         ]
+
+        if len(recommendations) < top_k:
+            excluded_movie_ids = {
+                self.movielens.movies[movie_index] for movie_index in interacted_movies
+            }
+            excluded_movie_ids.update(movie_id for movie_id, _ in recommendations)
+            recommendations.extend(
+                self.recommend_cold_start(
+                    top_k=top_k - len(recommendations),
+                    genre=genre,
+                    exclude_movie_ids=excluded_movie_ids,
+                    trained_movie_ids_only=False,
+                )
+            )
+
         self.display_user_recommendations(user_id, recommendations)
         return recommendations
 
-    def recommend_cold_start(self, top_k=10, genre=None):
-        candidate_movie_indices = [
-            movie_index
-            for movie_index in range(len(self.movielens.movies))
-            if self._genre_matches(movie_index, genre)
+    def recommend_cold_start(
+        self,
+        top_k=10,
+        genre=None,
+        exclude_movie_ids=None,
+        trained_movie_ids_only=False,
+    ):
+        exclude_movie_ids = exclude_movie_ids or set()
+        if trained_movie_ids_only:
+            candidate_movie_ids = list(self.movielens.movies)
+        else:
+            candidate_movie_ids = self.catalog_movie_ids
+
+        candidate_movie_ids = [
+            movie_id
+            for movie_id in candidate_movie_ids
+            if movie_id not in exclude_movie_ids
+            and self._genre_matches_movie_id(movie_id, genre)
         ]
         ranked_movies = sorted(
-            candidate_movie_indices,
-            key=lambda movie_index: self.movie_popularity_scores.get(movie_index, 0.0),
+            candidate_movie_ids,
+            key=lambda movie_id: self.catalog_popularity_scores.get(movie_id, 0.0),
             reverse=True,
         )
         return [
-            (movie_index, self.movie_popularity_scores.get(movie_index, 0.0))
-            for movie_index in ranked_movies[:top_k]
+            (movie_id, self.catalog_popularity_scores.get(movie_id, 0.0))
+            for movie_id in ranked_movies[:top_k]
         ]
 
     def movie_info(self, movie_id):
         movie_id = self.movielens.movies[movie_id]
+        return self.movie_info_by_id(movie_id)
+
+    def movie_info_by_id(self, movie_id):
+        movie = self.movies[self.movies["movieId"] == movie_id]
+        if movie.empty:
+            return {
+                "Movie ID": [movie_id],
+                "Title": f"Unknown movie {movie_id}",
+                "Genre": "(no genres listed)",
+            }
         return {
             "Movie ID": [movie_id],
-            "Title": self.movies[self.movies["movieId"] == movie_id]["title"].values[0],
-            "Genre": self.movies[self.movies["movieId"] == movie_id]["genres"].values[
-                0
-            ],
+            "Title": movie["title"].values[0],
+            "Genre": movie["genres"].values[0],
         }
 
     def display_similar_movies(self, movie_id, similar_ids):
@@ -239,12 +310,24 @@ class MovieRecommender:
             title = self.movie_info(id)
             print(f'- [{title["Movie ID"][0]}] {title["Title"]} [{title["Genre"]}]')
 
+    def display_similar_catalog_movies(self, target_movie_id, similar_movies):
+        main_title = self.movie_info_by_id(target_movie_id)
+        print(
+            f'Top {len(similar_movies)} cold-start similar movies to {main_title["Title"]} [{main_title["Genre"]}]'
+        )
+
+        for movie_id, score in similar_movies:
+            title = self.movie_info_by_id(movie_id)
+            print(
+                f'- [{title["Movie ID"][0]}] {title["Title"]} [{title["Genre"]}] score={score:.4f}'
+            )
+
     def display_user_recommendations(self, user_id, recommendations, cold_start=False):
         label = "cold-start recommendations" if cold_start else "recommendations"
         print(f"Top {len(recommendations)} {label} for user {user_id}")
 
-        for movie_index, score in recommendations:
-            title = self.movie_info(movie_index)
+        for movie_id, score in recommendations:
+            title = self.movie_info_by_id(movie_id)
             print(
                 f'- [{title["Movie ID"][0]}] {title["Title"]} [{title["Genre"]}] score={score:.4f}'
             )

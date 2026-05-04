@@ -127,8 +127,9 @@ full MovieLens 25M dataset can take significant time depending on hardware.
 Baseline comparison includes global mean, user mean, movie mean, popularity,
 item-item cosine similarity, and truncated SVD.
 
-Unknown users receive cold-start recommendations from a popularity-weighted
-movie mean baseline, with optional genre filtering.
+Unknown users and movies missing from the trained checkpoint receive cold-start
+recommendations from `movies.csv` genres and a popularity-weighted movie mean
+baseline, with optional genre filtering.
 
 Diagnostic plotting includes training loss vs validation MAE, rating
 distribution, ratings per user, ratings per movie, and movie embedding

@@ -71,9 +71,9 @@ class RecommendationTests(unittest.TestCase):
             }
         )
 
-        recommendations = recommender.recommend_for_user(123, top_k=3)
+        recommendations = recommender.recommend_for_user(123, top_k=2)
 
-        self.assertEqual([movie_index for movie_index, _ in recommendations], [2, 0])
+        self.assertEqual([movie_id for movie_id, _ in recommendations], [30, 10])
 
     def test_unknown_user_gets_cold_start_recommendations(self):
         import pandas as pd
@@ -91,11 +91,58 @@ class RecommendationTests(unittest.TestCase):
                 "genres": ["Action", "Drama"],
             }
         )
-        recommender.movie_popularity_scores = {0: 1.0, 1: 3.0}
+        recommender.catalog_movie_ids = [10, 20]
+        recommender.catalog_popularity_scores = {10: 1.0, 20: 3.0}
 
         recommendations = recommender.recommend_for_user(999, top_k=1)
 
-        self.assertEqual(recommendations, [(1, 3.0)])
+        self.assertEqual(recommendations, [(20, 3.0)])
+
+    def test_cold_start_can_recommend_catalog_movies_absent_from_training(self):
+        import pandas as pd
+
+        from recommender.recommend import MovieRecommender
+
+        recommender = object.__new__(MovieRecommender)
+        recommender.movielens = type(
+            "MovieLensStub", (), {"user_map": {}, "movies": [10]}
+        )()
+        recommender.movies = pd.DataFrame(
+            {
+                "movieId": [10, 20],
+                "title": ["A", "B"],
+                "genres": ["Action", "Action"],
+            }
+        )
+        recommender.catalog_movie_ids = [10, 20]
+        recommender.catalog_popularity_scores = {10: 1.0, 20: 3.0}
+
+        recommendations = recommender.recommend_for_user(999, top_k=2)
+
+        self.assertEqual(recommendations, [(20, 3.0), (10, 1.0)])
+
+    def test_unknown_similar_movie_uses_catalog_genre_popularity(self):
+        import pandas as pd
+
+        from recommender.recommend import MovieRecommender
+
+        recommender = object.__new__(MovieRecommender)
+        recommender.movielens = type(
+            "MovieLensStub", (), {"movie_map": {}, "movies": [10]}
+        )()
+        recommender.movies = pd.DataFrame(
+            {
+                "movieId": [10, 20, 30],
+                "title": ["A", "B", "C"],
+                "genres": ["Action", "Action|Drama", "Comedy"],
+            }
+        )
+        recommender.catalog_movie_ids = [10, 20, 30]
+        recommender.catalog_popularity_scores = {10: 1.0, 20: 3.0, 30: 5.0}
+
+        recommendations = recommender.get_similar(10, top_n=1)
+
+        self.assertEqual(recommendations, [(20, 3.0)])
 
 
 if __name__ == "__main__":
